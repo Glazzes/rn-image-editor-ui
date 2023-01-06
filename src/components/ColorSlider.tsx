@@ -23,6 +23,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
+import {Ionicons} from '@expo/vector-icons';
 import {Gesture, GestureDetector} from 'react-native-gesture-handler';
 import {clamp} from './clampSelectionBoundaries';
 import {useVector} from '../utils/useVector';
@@ -35,8 +36,8 @@ type FreeHandStroke = {
 };
 
 const {width, height} = Dimensions.get('window');
-const HEIGHT = 15;
-const SLIDER_WIDTH = width * 0.9;
+const SIZE = 15;
+const SLIDER_WIDTH = width * 0.7;
 
 const colors = [
   '#ea294b',
@@ -59,8 +60,8 @@ const colorInputRange = colors.map((_, index) => {
 const ColorSlider: React.FC<ColorSliderProps> = ({}) => {
   const [strokes, setStrokes] = useState<FreeHandStroke[]>([]);
 
-  const skiaTranslate = useValue<number>(-SLIDER_WIDTH / 2 + HEIGHT);
-  const translate = useVector(-SLIDER_WIDTH / 2 + HEIGHT, 0);
+  const skiaTranslate = useValue<number>(0);
+  const translate = useVector(0, 0);
   const offsetX = useSharedValue<number>(0);
   const scale = useSharedValue<number>(1);
 
@@ -74,14 +75,14 @@ const ColorSlider: React.FC<ColorSliderProps> = ({}) => {
   // animation stuff
   const color = useComputedValue(() => {
     return interpolateColors(
-      skiaTranslate.current + SLIDER_WIDTH / 2 - HEIGHT,
+      skiaTranslate.current + SLIDER_WIDTH / 2 - SIZE,
       colorInputRange,
       colors,
     );
   }, [skiaTranslate]);
 
   const translation = useDerivedValue<number>(() => {
-    const offset = (width * 0.9) / 2 - HEIGHT;
+    const offset = SLIDER_WIDTH / 2;
     return clamp(translate.x.value, -offset, offset);
   }, [translate.x]);
 
@@ -120,37 +121,38 @@ const ColorSlider: React.FC<ColorSliderProps> = ({}) => {
   }, translate.x);
 
   // shit to delete
-  const touchHandler = useTouchHandler({
-    onStart: ({x, y}) => {
-      const newPath = Skia.Path.Make();
-      newPath.moveTo(x, y);
+  const temporalPath = Skia.Path.Make();
+  const touchHandler = useTouchHandler(
+    {
+      onStart: ({x, y}) => {
+        temporalPath.reset();
+        temporalPath.moveTo(x, y);
+      },
+      onActive: ({x, y}) => {
+        temporalPath.lineTo(x, y);
+      },
+      onEnd: _ => {
+        const stroke: FreeHandStroke = {
+          path: temporalPath.copy(),
+          color: color.current,
+        };
 
-      const drawing: FreeHandStroke = {
-        path: newPath,
-        color: color.current,
-      };
-
-      setStrokes(d => [drawing, ...d]);
+        setStrokes(strks => [...strks, stroke]);
+      },
     },
-    onActive: ({x, y}) => {
-      const lastDrawing = strokes[strokes.length - 1];
-      lastDrawing.path.lineTo(x, y);
-    },
-  });
+    [strokes],
+  );
 
   return (
     <View style={styles.flex}>
-      <View style={styles.slider}>
+      <Ionicons size={20} color={'white'} name={'ios-arrow-undo'} />
+      <Ionicons size={20} color={'white'} name={'ios-flashlight-sharp'} />
+      <View style={styles.sliderContainer}>
         <Canvas style={styles.slider}>
-          <RoundedRect
-            x={0}
-            y={0}
-            width={SLIDER_WIDTH}
-            height={HEIGHT}
-            r={HEIGHT}>
+          <RoundedRect x={0} y={0} width={SLIDER_WIDTH} height={SIZE} r={SIZE}>
             <LinearGradient
-              start={vec(HEIGHT, 0)}
-              end={vec(SLIDER_WIDTH, HEIGHT)}
+              start={vec(SIZE, 0)}
+              end={vec(SLIDER_WIDTH, SIZE)}
               colors={colors}
             />
           </RoundedRect>
@@ -158,31 +160,11 @@ const ColorSlider: React.FC<ColorSliderProps> = ({}) => {
         <GestureDetector gesture={pan}>
           <Animated.View style={[styles.indicator, indicatorStyles]}>
             <Canvas style={styles.indicatorColor}>
-              <Circle
-                r={HEIGHT / 4}
-                cx={HEIGHT / 4}
-                cy={HEIGHT / 4}
-                color={color}
-              />
+              <Circle r={SIZE / 4} cx={SIZE / 4} cy={SIZE / 4} color={color} />
             </Canvas>
           </Animated.View>
         </GestureDetector>
       </View>
-      <Canvas style={styles.canvas} onTouch={touchHandler}>
-        <Fill color={'#fff'} />
-        {strokes.map((drawing, index) => {
-          return (
-            <Path
-              key={`drawing-${index}`}
-              path={drawing.path}
-              color={drawing.color}
-              strokeWidth={3}
-              strokeCap={'round'}
-              style={'stroke'}
-            />
-          );
-        })}
-      </Canvas>
     </View>
   );
 };
@@ -197,10 +179,18 @@ const styles = StyleSheet.create({
     width,
     height,
     backgroundColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sliderContainer: {
+    height: SIZE * 2,
+    width: SLIDER_WIDTH,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   slider: {
     width: SLIDER_WIDTH,
-    height: HEIGHT,
+    height: SIZE,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -211,16 +201,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     justifyContent: 'center',
     alignItems: 'center',
-    height: HEIGHT * 2,
-    width: HEIGHT * 2,
-    borderRadius: HEIGHT,
+    height: SIZE * 2,
+    width: SIZE * 2,
+    borderRadius: SIZE,
     position: 'absolute',
-    top: -HEIGHT / 2,
   },
   indicatorColor: {
-    height: HEIGHT / 2,
-    width: HEIGHT / 2,
-    borderRadius: HEIGHT / 4,
+    height: SIZE / 2,
+    width: SIZE / 2,
+    borderRadius: SIZE / 4,
   },
 });
 

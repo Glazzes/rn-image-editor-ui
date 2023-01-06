@@ -5,6 +5,8 @@ import ImageTest from './src/components/ImageTest';
 import Selection from './src/components/Selection';
 import {Colors} from './src/utils/colors';
 import ColorSlider from './src/components/ColorSlider';
+import SelectionTesting from './src/components/SelectionTesting';
+import MeasureTest from './src/components/MeasureTest';
 
 type StackParamList = {
   Home: undefined;
@@ -14,10 +16,6 @@ type StackParamList = {
 const Stack = createStackNavigator<StackParamList>();
 
 const App = () => {
-  useEffect(() => {
-    console.log(Colors.hexToRgb('#3366ff'));
-  }, []);
-
   return (
     <NavigationContainer>
       <Stack.Navigator
@@ -25,7 +23,7 @@ const App = () => {
         screenOptions={{
           headerShown: false,
         }}>
-        <Stack.Screen name="Home" component={ColorSlider} />
+        <Stack.Screen name="Home" component={Selection} />
       </Stack.Navigator>
     </NavigationContainer>
   );

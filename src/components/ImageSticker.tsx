@@ -11,7 +11,7 @@ import {leftBallHitslop, rightBallHitslop} from './constants';
 import {getStickerInfo} from '../utils/getStickerInfo';
 import {useVector} from '../utils/useVector';
 
-type StickerTestProps = {
+type ImageStickerProps = {
   uri: string;
 };
 
@@ -20,7 +20,7 @@ const BORDER_SIZE = IMAGE_SIZE * Math.SQRT2;
 const SIZE = 140;
 const R = SIZE / 2;
 
-const StickerTest: React.FC<StickerTestProps> = ({}) => {
+const ImageSticker: React.FC<ImageStickerProps> = ({}) => {
   const containerRef = useAnimatedRef<Animated.View>();
 
   const translate = useVector(0, 0);
@@ -208,4 +208,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default StickerTest;
+export default ImageSticker;

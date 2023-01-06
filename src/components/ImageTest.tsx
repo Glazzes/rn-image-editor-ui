@@ -101,14 +101,15 @@ const ImageTest: React.FC<ImageTestProps> = ({}) => {
     .onChange(e => {
       sliderTranslateX.value = sliderTranslateXOffset.value + e.translationX;
 
-      /*
-      clampSelectionBoundaries({
-        translate,
+      const {x, y} = clampSelectionBoundaries({
+        translate: {x: translate.x.value, y: translate.y.value},
         imageDimensions: dimensions.value.image,
         selectionDimensions: dimensions.value.selection,
         scale: scale.value,
       });
-      */
+
+      translate.x.value = x;
+      translate.y.value = y;
     });
 
   const imagePan = Gesture.Pan()

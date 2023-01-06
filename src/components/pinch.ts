@@ -1,14 +1,5 @@
 import Animated from 'react-native-reanimated';
-
-type Vector<T> = {
-  x: T;
-  y: T;
-};
-
-type Coordiantes = {
-  x: number;
-  y: number;
-};
+import {Vector} from '../utils/types';
 
 type PinchEvent = {
   focalX: number;
@@ -18,9 +9,9 @@ type PinchEvent = {
 
 type PinchOptions = {
   event: PinchEvent;
-  center: Coordiantes;
+  center: Vector<number>;
   origin: Vector<Animated.SharedValue<number>>;
-  offset: Coordiantes;
+  offset: Vector<number>;
   canAssignOrigin: Animated.SharedValue<boolean>;
 };
 
