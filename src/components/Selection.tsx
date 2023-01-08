@@ -111,37 +111,68 @@ const Selection: React.FC<SelectionProps> = ({}) => {
   const selectionRef = useAnimatedRef<Animated.View>();
 
   const deltaX = useSharedValue<number>(0);
+  const lastTranslate = useSharedValue<number>(0);
 
   const rightOffset = useSharedValue<number>(0);
   const leftOffset = useSharedValue<number>(0);
-  const s = useSharedValue<boolean>(false);
+
+  const largestTranslate = useVector(0, 0);
+
+  /*
+    When shrinking and expanding the dynamic selection beyond its original dimensions
+    will result in additional offset according to the current selection width and
+    the largest image's width recorded, this value aims to keep the image in a static position
+    as the gesture is active
+  */
+  const extraOffset = useSharedValue<number>(0);
+
+  const measureHorizontalOffsets = () => {
+    'worklet';
+    const selectionMeasure = measure(selectionRef);
+    const imageMeasure = measure(imageRef);
+
+    leftOffset.value =
+      imageMeasure.pageX < 0
+        ? Math.abs(imageMeasure.pageX) + selectionMeasure.pageX
+        : selectionMeasure.pageX - imageMeasure.pageX;
+
+    rightOffset.value =
+      Math.round(imageMeasure.width) -
+      Math.round(selectionMeasure.width) -
+      leftOffset.value;
+
+    dimensionsOffset.width.value = dimensions.width.value;
+  };
+
+  const onEndHorizontalPan = () => {
+    'worklet';
+    deltaX.value = 0;
+    extraOffset.value = 0;
+    largestTranslate.x.value = 0;
+
+    translate.x.value = withTiming(0);
+    translateImage.x.value = withTiming(
+      translateImage.x.value - translate.x.value,
+    );
+  };
 
   const rightPan = Gesture.Pan()
     .maxPointers(1)
-    .onBegin(_ => {
-      const selectionMeasure = measure(selectionRef);
-      const imageMeasure = measure(imageRef);
-
-      leftOffset.value =
-        imageMeasure.pageX < 0
-          ? Math.abs(imageMeasure.pageX) + selectionMeasure.pageX
-          : selectionMeasure.pageX - imageMeasure.pageX;
-
-      rightOffset.value =
-        Math.round(imageMeasure.width) -
-        Math.round(selectionMeasure.width) -
-        leftOffset.value;
-    })
+    .onStart(measureHorizontalOffsets)
     .onChange(({translationX}) => {
       const delta = translationX - deltaX.value;
-      const maxOffset = leftOffset.value + rightOffset.value;
+      const maxOffset =
+        leftOffset.value + rightOffset.value + extraOffset.value;
+
+      const actualRightOffset = rightOffset.value + extraOffset.value;
 
       translate.x.value += delta / 2;
-      dimensions.width.value += delta;
+      dimensions.width.value = dimensionsOffset.width.value + translationX;
 
       if (
-        translationX >= rightOffset.value &&
-        translationX <= leftOffset.value
+        translationX >= actualRightOffset &&
+        translationX <= leftOffset.value &&
+        translationX >= largestTranslate.x.value
       ) {
         translateImage.x.value = Math.max(
           translateImage.x.value,
@@ -155,62 +186,64 @@ const Selection: React.FC<SelectionProps> = ({}) => {
           translateImage.x.value + delta / 2,
         );
 
-        s.value = true;
+        extraOffset.value += delta;
       }
 
-      largestWidth.value = Math.max(largestWidth.value, dimensions.width.value);
       deltaX.value = translationX;
-    })
-    .onEnd(() => {
-      deltaX.value = 0;
-      translateImage.x.value = withTiming(
-        translateImage.x.value - translate.x.value,
+      largestWidth.value = Math.max(largestWidth.value, dimensions.width.value);
+      largestTranslate.x.value = Math.max(
+        translationX,
+        largestTranslate.x.value,
       );
-      translate.x.value = withTiming(0);
-      s.value = false;
-    });
+    })
+    .onEnd(onEndHorizontalPan);
 
   const leftPan = Gesture.Pan()
     .maxPointers(1)
-    .onStart(_ => {
-      const selectionMeasure = measure(selectionRef);
-      const imageMeasure = measure(imageRef);
-
-      leftOffset.value =
-        imageMeasure.pageX < 0
-          ? Math.abs(imageMeasure.pageX) + selectionMeasure.pageX
-          : imageMeasure.pageX - selectionMeasure.pageX;
-
-      rightOffset.value =
-        Math.round(imageMeasure.width) -
-        Math.round(selectionMeasure.width) -
-        rightOffset.value;
-    })
+    .onStart(measureHorizontalOffsets)
     .onChange(({translationX}) => {
       const normalizedTranslation = -1 * translationX;
       const delta = translationX - deltaX.value;
-      const maxOffset = leftOffset.value + rightOffset.value;
+      const maxOffset =
+        leftOffset.value + rightOffset.value + extraOffset.value;
+
+      const actualLeftOffset = leftOffset.value + extraOffset.value;
 
       translate.x.value += delta / 2;
-      dimensions.width.value += -1 * delta;
+      dimensions.width.value =
+        dimensionsOffset.width.value + normalizedTranslation;
 
-      if (translationX >= -1 * leftOffset.value) {
+      if (
+        normalizedTranslation >= actualLeftOffset &&
+        normalizedTranslation >= largestTranslate.x.value &&
+        normalizedTranslation <= maxOffset
+      ) {
+        translateImage.x.value = Math.min(
+          translateImage.x.value,
+          translateImage.x.value + delta,
+        );
+      }
+
+      if (normalizedTranslation >= maxOffset) {
         translateImage.x.value = Math.min(
           translateImage.x.value,
           translateImage.x.value + delta / 2,
+        );
+
+        extraOffset.value = Math.max(
+          extraOffset.value,
+          extraOffset.value + -1 * delta,
         );
       }
 
       deltaX.value = translationX;
       largestWidth.value = Math.max(largestWidth.value, dimensions.width.value);
-    })
-    .onEnd(_ => {
-      deltaX.value = 0;
-      translate.x.value = withTiming(0);
-      translateImage.x.value = withTiming(
-        translateImage.x.value - translate.x.value,
+      largestTranslate.x.value = Math.max(
+        normalizedTranslation,
+        largestTranslate.x.value,
       );
-    });
+    })
+    .onEnd(onEndHorizontalPan);
 
   const verticalPan = Gesture.Pan()
     .onStart(_ => {
@@ -266,7 +299,7 @@ const Selection: React.FC<SelectionProps> = ({}) => {
         style={[styles.image, imageStyles]}
       />
 
-      <GestureDetector gesture={leftPan}>
+      <GestureDetector gesture={rightPan}>
         <Animated.View
           ref={selectionRef}
           style={[styles.selection, selectionStyles]}

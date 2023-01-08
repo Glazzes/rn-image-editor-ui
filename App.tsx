@@ -7,6 +7,7 @@ import {Colors} from './src/utils/colors';
 import ColorSlider from './src/components/ColorSlider';
 import SelectionTesting from './src/components/SelectionTesting';
 import MeasureTest from './src/components/MeasureTest';
+import TextTesting from './src/components/TextTesting';
 
 type StackParamList = {
   Home: undefined;
@@ -23,7 +24,7 @@ const App = () => {
         screenOptions={{
           headerShown: false,
         }}>
-        <Stack.Screen name="Home" component={Selection} />
+        <Stack.Screen name="Home" component={TextTesting} />
       </Stack.Navigator>
     </NavigationContainer>
   );
