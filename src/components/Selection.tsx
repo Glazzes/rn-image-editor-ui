@@ -110,9 +110,6 @@ const Selection: React.FC<SelectionProps> = ({}) => {
   const imageRef = useAnimatedRef<Animated.Image>();
   const selectionRef = useAnimatedRef<Animated.View>();
 
-  const deltaX = useSharedValue<number>(0);
-  const lastTranslate = useSharedValue<number>(0);
-
   const rightOffset = useSharedValue<number>(0);
   const leftOffset = useSharedValue<number>(0);
 
@@ -146,7 +143,6 @@ const Selection: React.FC<SelectionProps> = ({}) => {
 
   const onEndHorizontalPan = () => {
     'worklet';
-    deltaX.value = 0;
     extraOffset.value = 0;
     largestTranslate.x.value = 0;
 
@@ -159,14 +155,13 @@ const Selection: React.FC<SelectionProps> = ({}) => {
   const rightPan = Gesture.Pan()
     .maxPointers(1)
     .onStart(measureHorizontalOffsets)
-    .onChange(({translationX}) => {
-      const delta = translationX - deltaX.value;
+    .onChange(({translationX, changeX}) => {
       const maxOffset =
         leftOffset.value + rightOffset.value + extraOffset.value;
 
       const actualRightOffset = rightOffset.value + extraOffset.value;
 
-      translate.x.value += delta / 2;
+      translate.x.value += changeX / 2;
       dimensions.width.value = dimensionsOffset.width.value + translationX;
 
       if (
@@ -176,20 +171,19 @@ const Selection: React.FC<SelectionProps> = ({}) => {
       ) {
         translateImage.x.value = Math.max(
           translateImage.x.value,
-          translateImage.x.value + delta,
+          translateImage.x.value + changeX,
         );
       }
 
       if (translationX > maxOffset) {
         translateImage.x.value = Math.max(
           translateImage.x.value,
-          translateImage.x.value + delta / 2,
+          translateImage.x.value + changeX / 2,
         );
 
-        extraOffset.value += delta;
+        extraOffset.value += changeX;
       }
 
-      deltaX.value = translationX;
       largestWidth.value = Math.max(largestWidth.value, dimensions.width.value);
       largestTranslate.x.value = Math.max(
         translationX,
@@ -201,15 +195,14 @@ const Selection: React.FC<SelectionProps> = ({}) => {
   const leftPan = Gesture.Pan()
     .maxPointers(1)
     .onStart(measureHorizontalOffsets)
-    .onChange(({translationX}) => {
+    .onChange(({translationX, changeX}) => {
       const normalizedTranslation = -1 * translationX;
-      const delta = translationX - deltaX.value;
       const maxOffset =
         leftOffset.value + rightOffset.value + extraOffset.value;
 
       const actualLeftOffset = leftOffset.value + extraOffset.value;
 
-      translate.x.value += delta / 2;
+      translate.x.value += changeX / 2;
       dimensions.width.value =
         dimensionsOffset.width.value + normalizedTranslation;
 
@@ -220,23 +213,22 @@ const Selection: React.FC<SelectionProps> = ({}) => {
       ) {
         translateImage.x.value = Math.min(
           translateImage.x.value,
-          translateImage.x.value + delta,
+          translateImage.x.value + changeX,
         );
       }
 
       if (normalizedTranslation >= maxOffset) {
         translateImage.x.value = Math.min(
           translateImage.x.value,
-          translateImage.x.value + delta / 2,
+          translateImage.x.value + changeX / 2,
         );
 
         extraOffset.value = Math.max(
           extraOffset.value,
-          extraOffset.value + -1 * delta,
+          extraOffset.value + -1 * changeX,
         );
       }
 
-      deltaX.value = translationX;
       largestWidth.value = Math.max(largestWidth.value, dimensions.width.value);
       largestTranslate.x.value = Math.max(
         normalizedTranslation,

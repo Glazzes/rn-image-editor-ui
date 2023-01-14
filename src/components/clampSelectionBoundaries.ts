@@ -9,14 +9,16 @@ export const clamp = (
   return Math.max(lowerBound, Math.min(value, upperBound));
 };
 
-type Options = {
+type ClampSelectionOptions = {
   translate: Vector<number>;
   selectionDimensions: Dimension;
   imageDimensions: Dimension;
   scale: number;
 };
 
-export const clampSelectionBoundaries = (options: Options): Vector<number> => {
+export const clampSelectionBoundaries = (
+  options: ClampSelectionOptions,
+): Vector<number> => {
   'worklet';
   const {translate, selectionDimensions, imageDimensions, scale} = options;
 
