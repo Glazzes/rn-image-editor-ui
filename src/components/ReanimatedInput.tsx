@@ -4,7 +4,7 @@ import Animated, {useAnimatedProps} from 'react-native-reanimated';
 import {TextInput} from 'react-native-gesture-handler';
 
 type ReanimatedInputProps = {
-  text: Animated.SharedValue<string> | Animated.SharedValue<number>;
+  text: Animated.SharedValue<string>;
 };
 
 Animated.addWhitelistedNativeProps({text: true});
@@ -20,7 +20,7 @@ const ReanimatedInput: React.FC<
   return (
     <AnimatedTextInput
       animatedProps={animatedProps}
-      value={props.text.value as any}
+      text={props.text.value}
       {...props}
     />
   );

@@ -1,31 +1,20 @@
-import {View, StyleSheet, TextInput} from 'react-native';
-import React from 'react';
-import {
-  Canvas,
-  Fill,
-  useComputedValue,
-  useValue,
-} from '@shopify/react-native-skia';
-import Animated, {
-  useAnimatedProps,
-  useSharedValue,
-} from 'react-native-reanimated';
+import {View, StyleSheet} from 'react-native';
+import React, {useEffect} from 'react';
+import {useComputedValue, useValue} from '@shopify/react-native-skia';
+import {useSharedValue} from 'react-native-reanimated';
 import {rgbToHex} from '../utils/colors';
 import ChannelSlider from './ChannelSlider';
+import ReanimatedInput from './ReanimatedInput';
+import {useFonts, unloadAsync} from 'expo-font';
 
 type ColorSlidersProps = {};
 
-Animated.addWhitelistedNativeProps({text: true});
-const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
+const FONT = {UberBold: require('../assets/UberBold.otf')};
 
 const ColorSliders: React.FC<ColorSlidersProps> = ({}) => {
-  const currentHexColor = useSharedValue<string>('#000000');
-  const animatedProps = useAnimatedProps(() => {
-    return {
-      text: currentHexColor.value,
-    } as any;
-  });
+  const [isLoaded] = useFonts(FONT);
 
+  const currentHexColor = useSharedValue<string>('#000000');
   const r = useValue<number>(0);
   const g = useValue<number>(0);
   const b = useValue<number>(0);
@@ -43,6 +32,14 @@ const ColorSliders: React.FC<ColorSlidersProps> = ({}) => {
     a,
   };
 
+  const onChangeText = (hexColor: string) => {
+    const regex = new RegExp(/^([A-F\d]{3}|([A-F\d]{6}))$/gi);
+    const isValid = regex.test(hexColor);
+    if (!isValid) {
+      return;
+    }
+  };
+
   useComputedValue(() => {
     const hexColor = rgbToHex({
       r: r.current,
@@ -53,13 +50,20 @@ const ColorSliders: React.FC<ColorSlidersProps> = ({}) => {
     currentHexColor.value = hexColor;
   }, [r, g, b]);
 
+  useEffect(() => {
+    unloadAsync(FONT);
+  }, []);
+
+  if (!isLoaded) {
+    return null;
+  }
+
   return (
     <View style={styles.root}>
       <ChannelSlider channel={'r'} {...sliderProps} />
       <ChannelSlider channel={'g'} {...sliderProps} />
       <ChannelSlider channel={'b'} {...sliderProps} />
-      <ChannelSlider channel={'a'} {...sliderProps} />
-      <AnimatedTextInput editable={false} animatedProps={animatedProps} />
+      <ReanimatedInput text={currentHexColor} onChangeText={onChangeText} />
     </View>
   );
 };

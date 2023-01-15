@@ -32,11 +32,11 @@ const hex: {[id: number]: string | number} = {
 export const rgbToHex = (color: RGBColor): string => {
   'worklet';
   const r1 = hex[Math.floor(color.r / 16)];
-  const r2 = hex[Math.floor(color.r % 16)];
+  const r2 = hex[Math.round(color.r) % 16];
   const g1 = hex[Math.floor(color.g / 16)];
-  const g2 = hex[Math.floor(color.g % 16)];
+  const g2 = hex[Math.round(color.g) % 16];
   const b1 = hex[Math.floor(color.b / 16)];
-  const b2 = hex[Math.floor(color.b % 16)];
+  const b2 = hex[Math.round(color.b) % 16];
   return `#${r1}${r2}${g1}${g2}${b1}${b2}`;
 };
 

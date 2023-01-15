@@ -65,6 +65,29 @@ const ChannelSlider: React.FC<ChannelSliderProps> = ({
   b,
   a,
 }) => {
+  const hexChannel = useSharedValue<string>('0');
+  const translateX = useSharedValue<number>(
+    channel === 'a' ? SLIDER_WIDTH / 2 : -SLIDER_WIDTH / 2,
+  );
+  const offsetX = useSharedValue<number>(0);
+
+  // Logic stuff
+  const onChangeText = (value: string) => {
+    const channelValue = parseInt(value, 10);
+    if (isNaN(channelValue)) {
+      translateX.value = -SLIDER_WIDTH / 2;
+      return;
+    }
+
+    translateX.value = interpolate(
+      channelValue,
+      [0, 255],
+      [-SLIDER_WIDTH / 2, SLIDER_WIDTH / 2],
+      Extrapolate.CLAMP,
+    );
+  };
+
+  // Animation stuff
   const colors = useComputedValue(() => {
     if (channel === 'a') {
       return [
@@ -94,12 +117,6 @@ const ChannelSlider: React.FC<ChannelSliderProps> = ({
     return ['transparent', 'transparent'];
   }, [channel, r, g, b, a]);
 
-  const hexChannel = useSharedValue<number>(0);
-  const translateX = useSharedValue<number>(
-    channel === 'a' ? SLIDER_WIDTH / 2 : -SLIDER_WIDTH / 2,
-  );
-  const offsetX = useSharedValue<number>(0);
-
   const pan = Gesture.Pan()
     .onStart(_ => {
       offsetX.value = translateX.value;
@@ -118,12 +135,14 @@ const ChannelSlider: React.FC<ChannelSliderProps> = ({
   useAnimatedReaction(
     () => translateX.value,
     tx => {
-      hexChannel.value = interpolateWorklet(
+      const channelValue = interpolateWorklet(
         tx,
         [-SLIDER_WIDTH / 2, SLIDER_WIDTH / 2],
         [0, 255],
         Extrapolate.CLAMP,
       );
+
+      hexChannel.value = '' + Math.round(channelValue);
     },
   );
 
@@ -158,9 +177,8 @@ const ChannelSlider: React.FC<ChannelSliderProps> = ({
   }, translateX);
 
   return (
-    <View>
-      {channel !== 'a' ? <ReanimatedInput text={hexChannel} /> : null}
-      <View style={styles.root}>
+    <View style={styles.root}>
+      <View style={styles.slider}>
         <Canvas style={styles.canvas}>
           {channel === 'a' ? (
             <CheckerBoard
@@ -194,7 +212,12 @@ const ChannelSlider: React.FC<ChannelSliderProps> = ({
               ) : (
                 <Fill color={currentColor} />
               )}
-              <Path style={'fill'} color={currentColor} path={upperPath} />
+              <Path
+                antiAlias={true}
+                style={'fill'}
+                color={currentColor}
+                path={upperPath}
+              />
               <Path
                 antiAlias={true}
                 style={'fill'}
@@ -214,12 +237,24 @@ const ChannelSlider: React.FC<ChannelSliderProps> = ({
           </Animated.View>
         </GestureDetector>
       </View>
+      <ReanimatedInput
+        text={hexChannel}
+        style={styles.input}
+        keyboardType={'numeric'}
+        onChangeText={onChangeText}
+      />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   root: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginVertical: 5,
+  },
+  slider: {
     width: SLIDER_WIDTH,
     height: BALL_SIZE,
     backgroundColor: '#fff',
@@ -242,6 +277,19 @@ const styles = StyleSheet.create({
   ballCanvas: {
     width: BALL_SIZE,
     height: BALL_SIZE,
+  },
+  input: {
+    fontFamily: 'UberBold',
+    backgroundColor: '#313131',
+    color: '#fff',
+    margin: 0,
+    height: 40,
+    width: 40,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    textAlign: 'center',
+    marginLeft: 10,
   },
 });
 
