@@ -1,5 +1,5 @@
-import {View, StyleSheet, Dimensions} from 'react-native';
-import React from 'react';
+import {View, StyleSheet, ViewStyle, Text} from 'react-native';
+import React, {useMemo} from 'react';
 import {Channel} from '../utils/colors';
 import {
   Canvas,
@@ -27,68 +27,108 @@ import {Gesture, GestureDetector} from 'react-native-gesture-handler';
 import {clamp} from './clampSelectionBoundaries';
 import CheckerBoard from './CheckerBoard';
 import ReanimatedInput from './ReanimatedInput';
+import {SLIDER_WIDTH} from './sliders/constants';
 
 type ChannelSliderProps = {
+  width: number;
   channel: Channel;
   currentColor: SkiaValue<string>;
+  translateX: Animated.SharedValue<number>;
+  isSliding: Animated.SharedValue<boolean>;
   r: SkiaMutableValue<number>;
   g: SkiaMutableValue<number>;
   b: SkiaMutableValue<number>;
   a: SkiaMutableValue<number>;
 };
 
-const {width} = Dimensions.get('window');
-const SLIDER_WIDTH = width * 0.75;
-const SLIDER_HEIGHT = 13;
-const BALL_SIZE = SLIDER_HEIGHT * 2;
+const SLIDER_HEIGHT = 10;
+const BALL_SIZE = 28;
 const STROKE_WIDTH = 2;
 
 const upperPath = Skia.Path.Make();
 upperPath.moveTo(0, 0);
-upperPath.lineTo(BALL_SIZE, 0);
+upperPath.lineTo(BALL_SIZE + 1, 0);
 upperPath.lineTo(0, BALL_SIZE);
 upperPath.lineTo(0, 0);
 upperPath.close();
 
 const lowerPath = Skia.Path.Make();
 lowerPath.moveTo(BALL_SIZE, 0);
-lowerPath.lineTo(BALL_SIZE, BALL_SIZE);
+lowerPath.lineTo(BALL_SIZE, BALL_SIZE + 1);
 lowerPath.lineTo(0, BALL_SIZE);
 lowerPath.lineTo(BALL_SIZE, 0);
 lowerPath.close();
 
 const ChannelSlider: React.FC<ChannelSliderProps> = ({
+  width,
   channel,
   currentColor,
+  translateX,
+  isSliding,
   r,
   g,
   b,
   a,
 }) => {
   const hexChannel = useSharedValue<string>('0');
-  const translateX = useSharedValue<number>(
-    channel === 'a' ? SLIDER_WIDTH / 2 : -SLIDER_WIDTH / 2,
-  );
   const offsetX = useSharedValue<number>(0);
 
+  const translateInputRange = [
+    -width / 2 + BALL_SIZE / 2,
+    width / 2 - BALL_SIZE / 2,
+  ];
+
   // Logic stuff
+  const channelName = useMemo(() => {
+    if (channel === 'r') {
+      return 'Red';
+    }
+
+    if (channel === 'g') {
+      return 'Green';
+    }
+
+    return 'Blue';
+  }, [channel]);
+
+  const sliderStyles: ViewStyle = {
+    width: width,
+    height: BALL_SIZE,
+    justifyContent: 'center',
+    alignItems: 'center',
+  };
+
+  const canvaStyles: ViewStyle = {
+    height: SLIDER_HEIGHT,
+    width: width,
+    borderRadius: SLIDER_HEIGHT,
+    overflow: 'hidden',
+  };
+
   const onChangeText = (value: string) => {
     const channelValue = parseInt(value, 10);
     if (isNaN(channelValue)) {
-      translateX.value = -SLIDER_WIDTH / 2;
+      translateX.value = -width / 2 + BALL_SIZE / 2;
+      return;
+    }
+
+    if (channelValue < 0 || channelValue > 255) {
       return;
     }
 
     translateX.value = interpolate(
       channelValue,
       [0, 255],
-      [-SLIDER_WIDTH / 2, SLIDER_WIDTH / 2],
+      translateInputRange,
       Extrapolate.CLAMP,
     );
   };
 
+  const onFocus = () => (isSliding.value = true);
+  const onBlur = () => (isSliding.value = false);
+
   // Animation stuff
-  const colors = useComputedValue(() => {
+  const gradient = useComputedValue(() => {
     if (channel === 'a') {
       return [
         `rgba(${r.current}, ${g.current}, ${b.current}, 0)`,
@@ -115,16 +155,22 @@ const ChannelSlider: React.FC<ChannelSliderProps> = ({
     }
 
     return ['transparent', 'transparent'];
-  }, [channel, r, g, b, a]);
+  }, [channel, r, g, b, a, currentColor]);
 
   const pan = Gesture.Pan()
     .onStart(_ => {
       offsetX.value = translateX.value;
+      isSliding.value = true;
     })
     .onChange(e => {
       const tx = offsetX.value + e.translationX;
-      translateX.value = clamp(tx, -SLIDER_WIDTH / 2, SLIDER_WIDTH / 2);
-    });
+      translateX.value = clamp(
+        tx,
+        translateInputRange[0],
+        translateInputRange[1],
+      );
+    })
+    .onEnd(_ => (isSliding.value = false));
 
   const animatedStyles = useAnimatedStyle(() => {
     return {
@@ -137,20 +183,21 @@ const ChannelSlider: React.FC<ChannelSliderProps> = ({
     tx => {
       const channelValue = interpolateWorklet(
         tx,
-        [-SLIDER_WIDTH / 2, SLIDER_WIDTH / 2],
+        translateInputRange,
         [0, 255],
         Extrapolate.CLAMP,
       );
 
-      hexChannel.value = '' + Math.round(channelValue);
+      hexChannel.value = '' + clamp(Math.round(channelValue), 0, 255);
     },
+    [translateX],
   );
 
   useSharedValueEffect(() => {
     if (channel === 'a') {
       a.current = interpolate(
         translateX.value,
-        [-SLIDER_WIDTH / 2, SLIDER_WIDTH / 2],
+        translateInputRange,
         [0, 1],
         Extrapolate.CLAMP,
       );
@@ -160,7 +207,7 @@ const ChannelSlider: React.FC<ChannelSliderProps> = ({
 
     const currentChannelValue = interpolate(
       translateX.value,
-      [-SLIDER_WIDTH / 2, SLIDER_WIDTH / 2],
+      translateInputRange,
       [0, 255],
       Extrapolate.CLAMP,
     );
@@ -178,77 +225,98 @@ const ChannelSlider: React.FC<ChannelSliderProps> = ({
 
   return (
     <View style={styles.root}>
-      <View style={styles.slider}>
-        <Canvas style={styles.canvas}>
-          {channel === 'a' ? (
-            <CheckerBoard
-              checkerSize={SLIDER_HEIGHT / 2}
-              width={SLIDER_WIDTH}
+      {channel !== 'a' ? (
+        <Text style={styles.channelName}>{channelName}</Text>
+      ) : null}
+      <View style={styles.sliderContainer}>
+        <View style={sliderStyles}>
+          <Canvas style={canvaStyles}>
+            {channel === 'a' ? (
+              <CheckerBoard
+                checkerSize={SLIDER_HEIGHT / 2}
+                width={width}
+                height={SLIDER_HEIGHT}
+                colors={['#000000', '#ffffff']}
+              />
+            ) : null}
+            <RoundedRect
+              x={0}
+              y={0}
+              width={width}
               height={SLIDER_HEIGHT}
-            />
-          ) : null}
-          <RoundedRect
-            x={0}
-            y={0}
-            width={SLIDER_WIDTH}
-            height={SLIDER_HEIGHT}
-            r={SLIDER_HEIGHT}>
-            <LinearGradient
-              start={vec(0, 0)}
-              end={vec(SLIDER_WIDTH, 0)}
-              colors={colors}
-            />
-          </RoundedRect>
-        </Canvas>
-        <GestureDetector gesture={pan}>
-          <Animated.View style={[animatedStyles, styles.ball]}>
-            <Canvas style={styles.ballCanvas}>
-              {channel === 'a' ? (
-                <CheckerBoard
-                  checkerSize={5}
-                  width={BALL_SIZE}
-                  height={BALL_SIZE}
+              r={SLIDER_HEIGHT}>
+              <LinearGradient
+                start={vec(0, SLIDER_HEIGHT)}
+                end={vec(width, 0)}
+                colors={gradient}
+              />
+            </RoundedRect>
+          </Canvas>
+          <GestureDetector gesture={pan}>
+            <Animated.View style={[animatedStyles, styles.ball]}>
+              <Canvas style={styles.ballCanvas}>
+                {channel === 'a' ? (
+                  <CheckerBoard
+                    checkerSize={5}
+                    width={BALL_SIZE}
+                    height={BALL_SIZE}
+                    colors={['#000000', '#f2eded']}
+                  />
+                ) : (
+                  <Fill color={currentColor} />
+                )}
+                <Path
+                  antiAlias={true}
+                  style={'fill'}
+                  color={currentColor}
+                  path={upperPath}
                 />
-              ) : (
-                <Fill color={currentColor} />
-              )}
-              <Path
-                antiAlias={true}
-                style={'fill'}
-                color={currentColor}
-                path={upperPath}
-              />
-              <Path
-                antiAlias={true}
-                style={'fill'}
-                color={currentColor}
-                path={lowerPath}
-                opacity={channel === 'a' ? a : 1}
-              />
-              <Circle
-                color={'#fff'}
-                cx={BALL_SIZE / 2}
-                cy={BALL_SIZE / 2}
-                r={BALL_SIZE / 2 - STROKE_WIDTH / 2}
-                strokeWidth={STROKE_WIDTH}
-                style={'stroke'}
-              />
-            </Canvas>
-          </Animated.View>
-        </GestureDetector>
+                <Path
+                  antiAlias={true}
+                  style={'fill'}
+                  color={currentColor}
+                  path={lowerPath}
+                  opacity={channel === 'a' ? a : 1}
+                />
+                <Circle
+                  color={'#fff'}
+                  cx={BALL_SIZE / 2}
+                  cy={BALL_SIZE / 2}
+                  r={BALL_SIZE / 2 - STROKE_WIDTH / 2}
+                  strokeWidth={STROKE_WIDTH}
+                  style={'stroke'}
+                />
+              </Canvas>
+            </Animated.View>
+          </GestureDetector>
+        </View>
+        {channel !== 'a' ? (
+          <View style={styles.inputContainer}>
+            <ReanimatedInput
+              text={hexChannel}
+              style={styles.input}
+              keyboardType={'numeric'}
+              onChangeText={onChangeText}
+              onFocus={onFocus}
+              onBlur={onBlur}
+            />
+          </View>
+        ) : null}
       </View>
-      <ReanimatedInput
-        text={hexChannel}
-        style={styles.input}
-        keyboardType={'numeric'}
-        onChangeText={onChangeText}
-      />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   root: {
+    marginVertical: 5,
+  },
+  channelName: {
+    color: '#ffffff',
+    fontFamily: 'UberBold',
+  },
+  sliderContainer: {
+    width: 320 - 32,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -257,7 +325,6 @@ const styles = StyleSheet.create({
   slider: {
     width: SLIDER_WIDTH,
     height: BALL_SIZE,
-    backgroundColor: '#fff',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -278,18 +345,21 @@ const styles = StyleSheet.create({
     width: BALL_SIZE,
     height: BALL_SIZE,
   },
-  input: {
-    fontFamily: 'UberBold',
-    backgroundColor: '#313131',
-    color: '#fff',
-    margin: 0,
-    height: 40,
-    width: 40,
+  inputContainer: {
+    backgroundColor: '#545454',
     borderRadius: 10,
+    width: 50,
+    height: BALL_SIZE,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  input: {
+    fontFamily: 'UberBold',
+    color: '#fff',
+    margin: 0,
+    padding: 0,
+    alignItems: 'center',
     textAlign: 'center',
-    marginLeft: 10,
   },
 });
 

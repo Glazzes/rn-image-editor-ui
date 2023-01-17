@@ -10,7 +10,7 @@ export type RGBA<T> = {
   [Name in Channel]: T;
 };
 
-const hex: {[id: number]: string | number} = {
+const rgb2HexValues: {[id: number]: string | number} = {
   0: 0,
   1: 1,
   2: 2,
@@ -29,15 +29,47 @@ const hex: {[id: number]: string | number} = {
   15: 'f',
 };
 
-export const rgbToHex = (color: RGBColor): string => {
+const hex2RGBValues: {[id: string]: number} = {
+  0: 0,
+  1: 1,
+  2: 2,
+  3: 3,
+  4: 4,
+  5: 5,
+  6: 6,
+  7: 7,
+  8: 8,
+  9: 9,
+  a: 10,
+  b: 11,
+  c: 12,
+  d: 13,
+  e: 14,
+  f: 15,
+};
+
+export const rgb2Hex = (color: RGBColor): string => {
   'worklet';
-  const r1 = hex[Math.floor(color.r / 16)];
-  const r2 = hex[Math.round(color.r) % 16];
-  const g1 = hex[Math.floor(color.g / 16)];
-  const g2 = hex[Math.round(color.g) % 16];
-  const b1 = hex[Math.floor(color.b / 16)];
-  const b2 = hex[Math.round(color.b) % 16];
+  const r1 = rgb2HexValues[Math.floor(color.r / 16)];
+  const r2 = rgb2HexValues[Math.round(color.r) % 16];
+  const g1 = rgb2HexValues[Math.floor(color.g / 16)];
+  const g2 = rgb2HexValues[Math.round(color.g) % 16];
+  const b1 = rgb2HexValues[Math.floor(color.b / 16)];
+  const b2 = rgb2HexValues[Math.round(color.b) % 16];
   return `#${r1}${r2}${g1}${g2}${b1}${b2}`;
+};
+
+export const hex2RGB = (hexColor: string): RGBColor => {
+  'worklet';
+  const r = hex2RGBValues[hexColor[0]] * 16 + hex2RGBValues[hexColor[1]];
+  const g = hex2RGBValues[hexColor[2]] * 16 + hex2RGBValues[hexColor[3]];
+  const b = hex2RGBValues[hexColor[4]] * 16 + hex2RGBValues[hexColor[5]];
+
+  return {
+    r,
+    g,
+    b,
+  };
 };
 
 export class Colors {

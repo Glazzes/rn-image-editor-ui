@@ -17,13 +17,7 @@ const ReanimatedInput: React.FC<
     return {text: props.text.value} as any;
   });
 
-  return (
-    <AnimatedTextInput
-      animatedProps={animatedProps}
-      text={props.text.value}
-      {...props}
-    />
-  );
+  return <AnimatedTextInput animatedProps={animatedProps} {...props} />;
 };
 
 export default ReanimatedInput;

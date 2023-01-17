@@ -5,12 +5,14 @@ type CheckerBoardProps = {
   checkerSize: number;
   width: number;
   height: number;
+  colors: [string, string];
 };
 
 const CheckerBoard: React.FC<CheckerBoardProps> = ({
   width,
   height,
   checkerSize,
+  colors,
 }) => {
   const columns = Math.ceil(width / checkerSize);
   const rows = Math.ceil(height / checkerSize);
@@ -22,9 +24,9 @@ const CheckerBoard: React.FC<CheckerBoardProps> = ({
         const x = index % columns;
         const y = Math.floor(index / columns);
 
-        let color = x % 2 === 0 ? '#000' : '#fff';
+        let color = x % 2 === 0 ? colors[0] : colors[1];
         if (y % 2 === 1) {
-          color = color === '#000' ? '#fff' : '#000';
+          color = color === colors[0] ? colors[1] : colors[0];
         }
 
         return (
