@@ -6,6 +6,7 @@ import Animated, {
   useAnimatedRef,
   useAnimatedStyle,
   useSharedValue,
+  withTiming,
 } from 'react-native-reanimated';
 import {leftBallHitslop, rightBallHitslop} from './constants';
 import {getStickerInfo} from '../utils/getStickerInfo';
@@ -31,12 +32,16 @@ const ImageSticker: React.FC<ImageStickerProps> = ({}) => {
   const radius = useSharedValue<number>(R);
   const radiusOffset = useSharedValue<number>(R);
 
+  const scale = useSharedValue<number>(1);
   const opacity = useSharedValue<number>(1);
 
   const tap = Gesture.Tap()
     .numberOfTaps(1)
     .onStart(_ => {
-      opacity.value = opacity.value === 0 ? 1 : 0;
+      opacity.value = withTiming(opacity.value > 0 ? 0 : 1);
+      if (scale.value === 1 || scale.value === 0) {
+        scale.value = withTiming(scale.value === 1 ? 0 : 1);
+      }
     });
 
   const translationPan = Gesture.Pan()
@@ -115,7 +120,7 @@ const ImageSticker: React.FC<ImageStickerProps> = ({}) => {
     height: radius.value * 2,
     borderRadius: radius.value,
     opacity: opacity.value,
-    transform: [{rotate: `${-1 * angle.value}rad`}],
+    transform: [{rotate: `${-1 * angle.value}rad`}, {scale: scale.value}],
   }));
 
   const rightBallStyles = useAnimatedStyle(() => {
@@ -163,7 +168,7 @@ const ImageSticker: React.FC<ImageStickerProps> = ({}) => {
           </GestureDetector>
 
           <Animated.Image
-            source={require('./hello.png')}
+            source={require('../assets/dog.png')}
             resizeMode={'cover'}
             resizeMethod={'scale'}
             style={[styles.image, imageStyles]}

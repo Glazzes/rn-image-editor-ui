@@ -48,6 +48,43 @@ const hex2RGBValues: {[id: string]: number} = {
   f: 15,
 };
 
+export const normalize = (color: RGBColor): RGBColor => {
+  'worklet';
+  return {
+    r: color.r / 255,
+    g: color.g / 255,
+    b: color.b / 255,
+  };
+};
+
+export const denormalize = (color: RGBColor): RGBColor => {
+  'worklet';
+  return {
+    r: color.r * 255,
+    g: color.g * 255,
+    b: color.b * 255,
+  };
+};
+
+export const mix = (start: RGBColor, end: RGBColor, t: number): RGBColor => {
+  'worklet';
+  const normalizedT = Math.max(Math.min(1, t), 0);
+  const deltaR = start.r - end.r;
+  const deltaG = start.g - end.g;
+  const deltaB = start.b - end.b;
+
+  return {
+    r: start.r + deltaR * normalizedT,
+    g: start.g + deltaG * normalizedT,
+    b: start.b + deltaB * normalizedT,
+  };
+};
+
+export const rgbToString = (rgb: RGBColor, opacity?: number): string => {
+  'worklet';
+  return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${opacity ?? 1})`;
+};
+
 export const rgb2Hex = (color: RGBColor): string => {
   'worklet';
   const r1 = rgb2HexValues[Math.floor(color.r / 16)];
@@ -59,11 +96,16 @@ export const rgb2Hex = (color: RGBColor): string => {
   return `#${r1}${r2}${g1}${g2}${b1}${b2}`;
 };
 
-export const hex2RGB = (hexColor: string): RGBColor => {
+export const hex2RGB = (color: string): RGBColor => {
   'worklet';
-  const r = hex2RGBValues[hexColor[0]] * 16 + hex2RGBValues[hexColor[1]];
-  const g = hex2RGBValues[hexColor[2]] * 16 + hex2RGBValues[hexColor[3]];
-  const b = hex2RGBValues[hexColor[4]] * 16 + hex2RGBValues[hexColor[5]];
+  const currentHex =
+    color.length === 3
+      ? color[0] + color[0] + color[1] + color[1] + color[2] + color[2]
+      : color;
+
+  const r = hex2RGBValues[currentHex[0]] * 16 + hex2RGBValues[currentHex[1]];
+  const g = hex2RGBValues[currentHex[2]] * 16 + hex2RGBValues[currentHex[3]];
+  const b = hex2RGBValues[currentHex[4]] * 16 + hex2RGBValues[currentHex[5]];
 
   return {
     r,
@@ -71,55 +113,3 @@ export const hex2RGB = (hexColor: string): RGBColor => {
     b,
   };
 };
-
-export class Colors {
-  private static colorRegex = /^#([a-f\d]{2}){3}$/gi;
-
-  public static hexToRgb(color: string): RGBColor {
-    const normalizedColor = color.toUpperCase();
-    const isColor = this.colorRegex.test(normalizedColor);
-    if (!isColor || normalizedColor.length !== 7) {
-      throw Error(`${color} is not a valid hex color`);
-    }
-
-    const result = normalizedColor.match(/([a-f\d]{2})/gi)!;
-
-    return {
-      r: this.parseHex(result[0]),
-      g: this.parseHex(result[1]),
-      b: this.parseHex(result[2]),
-    };
-  }
-
-  private static parseHex(hexPart: string): number {
-    let result = 0;
-    const isLetter = /^[A-F]$/;
-
-    const valueOne = hexPart[0];
-    const valueTwo = hexPart[1];
-
-    const isValueOneLetter = isLetter.test(valueOne);
-    const isValueTwoLtter = isLetter.test(valueTwo);
-
-    result += isValueOneLetter
-      ? (valueOne.charCodeAt(0) - 65 + 10) * 16
-      : parseInt(valueOne) * 16;
-
-    result += isValueTwoLtter
-      ? valueTwo.charCodeAt(0) - 65 + 10
-      : parseInt(valueTwo);
-
-    return result;
-  }
-
-  public static luminance(color: RGBColor): number {
-    const values = Object.values(color).map(channel => {
-      const normalizedChannel = (channel /= 255);
-      return normalizedChannel <= 0.03928
-        ? normalizedChannel / 12.92
-        : Math.pow((normalizedChannel + 0.055) / 1.055, 2.4);
-    });
-
-    return values[0] * 0.2126 + values[1] * 0.7152 + values[2] * 0.0722;
-  }
-}

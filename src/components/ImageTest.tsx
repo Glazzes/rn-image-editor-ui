@@ -11,7 +11,7 @@ import Animated, {
 import {Gesture, GestureDetector} from 'react-native-gesture-handler';
 import {pinch} from './pinch';
 import {clampSelectionBoundaries} from './clampSelectionBoundaries';
-import {getRotateTranslationDifference} from '../utils/getRotateTranslationDifference';
+import {getAxisRotationOffset} from '../utils/getAxisRotationOffset';
 import {useVector} from '../utils/useVector';
 
 type ImageTestProps = {};
@@ -123,15 +123,15 @@ const ImageTest: React.FC<ImageTestProps> = ({}) => {
       translateOffset.x.value = translate.x.value;
       translateOffset.y.value = translate.y.value;
     })
-    .onChange(e => {
-      const {x: originX, y: originY} = getRotateTranslationDifference(
-        e.translationX,
-        e.translationY,
+    .onChange(({translationX, translationY}) => {
+      const {x: offsetXForY, y: offsetYForX} = getAxisRotationOffset(
+        translationX,
+        translationY,
         angle.value,
       );
 
-      translate.x.value = translateOffset.x.value + e.translationX + originX;
-      translate.y.value = translateOffset.y.value + e.translationY + originY;
+      translate.x.value = translateOffset.x.value + translationX + offsetXForY;
+      translate.y.value = translateOffset.y.value + translationY + offsetYForX;
     })
     .onEnd(_ => {
       const {x, y} = clampSelectionBoundaries({

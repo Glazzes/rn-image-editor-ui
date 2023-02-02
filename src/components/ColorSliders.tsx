@@ -58,16 +58,13 @@ const ColorSliders: React.FC<ColorSlidersProps> = ({}) => {
   const onChangeText = (hexColor: string) => {
     text.value = hexColor;
     const regex = new RegExp(/^#?([A-F\d]{6}|([A-F\d]{3}))$/gi);
-    const isValid = regex.test(hexColor);
-    if (!isValid) {
+    const isValidHexColor = regex.test(hexColor);
+    if (!isValidHexColor) {
       return;
     }
 
     if (hexColor.length % 3 === 0) {
-      const colorToConvert =
-        hexColor.length === 3 ? hexColor + hexColor : hexColor;
-
-      const rgb = hex2RGB(colorToConvert);
+      const rgb = hex2RGB(hexColor);
 
       translateR.value = interpolate(
         rgb.r,
