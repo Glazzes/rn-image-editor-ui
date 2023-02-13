@@ -1,4 +1,4 @@
-import {View, StyleSheet} from 'react-native';
+import {View, StyleSheet, Dimensions} from 'react-native';
 import React, {useEffect} from 'react';
 import Animated, {
   measure,
@@ -8,8 +8,12 @@ import Animated, {
 } from 'react-native-reanimated';
 import {rotate} from '../utils/Vector';
 import {getAxisRotationOffset} from '../utils/getAxisRotationOffset';
+import { size } from '@shopify/react-native-skia';
 
 type MeasureTestProps = {};
+
+const {width, height} = Dimensions.get('window');
+const center = {x: width / 2, y: height / 2};
 
 const MeasureTest: React.FC<MeasureTestProps> = ({}) => {
   const ref = useAnimatedRef<Animated.View>();
@@ -23,9 +27,15 @@ const MeasureTest: React.FC<MeasureTestProps> = ({}) => {
         const m1 = measure(ref);
         const m2 = measure(ref2);
 
-        // const {x, y} = rotate({x: 5, y: 0}, Math.PI / 4);
-        const {x, y} = getAxisRotationOffset(100, 100, Math.PI / 4);
-        console.log(x, y);
+        const newPos = {
+          x: center.x - m2.pageX,
+          y: -1 * (center.y - m2.pageY),
+        };
+
+        const rPos = rotate(newPos, Math.PI / 9);
+
+        console.log(m1.pageX, m1.pageY);
+        console.log(rPos);
       })();
     }, 1000);
   }, [ref, ref2]);
@@ -56,7 +66,7 @@ const styles = StyleSheet.create({
     width: 200,
     height: 200,
     backgroundColor: '#3366ff',
-    transform: [{rotate: `${Math.PI / 4}rad`}],
+    transform: [{rotate: `${Math.PI / 9}rad`}],
   },
 });
 

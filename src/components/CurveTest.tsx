@@ -8,6 +8,8 @@ import {
   Path,
   Shader,
   Skia,
+  useClockValue,
+  useComputedValue,
   useImage,
   useTouchHandler,
   vec,
@@ -24,11 +26,13 @@ path.quadTo(200, 100, 100, 300);
 
 const shader = Skia.RuntimeEffect.Make(`
     uniform shader image;
+    uniform float time;
 
-    const float PI = 3.141592653589793;
-    const float angle = PI / 10.0;
+    const float TAU = 6.283185307179586;
 
     vec4 main(vec2 xy) {
+      float angle = (mod(time, 3000) / 3000) * TAU; 
+
       xy -= vec2(160);
       xy *= mat2(cos(angle), -1.0 * sin(angle), sin(angle), cos(angle));
       xy += vec2(160);
@@ -49,6 +53,11 @@ const CurveTest: React.FC<CurveTestProps> = ({}) => {
   const image = useImage(require('../assets/wolf.jpg'));
   const [displayOriginal, setDisplayOriginal] = useState<boolean>(false);
 
+  const time = useClockValue();
+  time.start();
+
+  const uniforms = useComputedValue(() => ({time: time.current}), [time]);
+
   const onTouch = useTouchHandler({
     onStart: _ => {
       setDisplayOriginal(true);
@@ -66,7 +75,7 @@ const CurveTest: React.FC<CurveTestProps> = ({}) => {
     <View style={styles.root}>
       <Canvas style={styles.canvas} onTouch={onTouch}>
         <Fill>
-          <Shader source={shader}>
+          <Shader source={shader} uniforms={uniforms}>
             <ImageShader
               image={image}
               x={0}

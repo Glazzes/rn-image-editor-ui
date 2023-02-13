@@ -3,10 +3,10 @@ import {TypeDimensions, Vector} from './types';
 
 export const useVector = (
   x: number,
-  y: number,
+  y?: number,
 ): Vector<Animated.SharedValue<number>> => {
   const valueX = useSharedValue<number>(x);
-  const valueY = useSharedValue<number>(y);
+  const valueY = useSharedValue<number>(y ?? x);
 
   return {x: valueX, y: valueY};
 };

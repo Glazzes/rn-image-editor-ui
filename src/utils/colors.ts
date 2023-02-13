@@ -1,13 +1,19 @@
+import {Extrapolate, interpolate} from 'react-native-reanimated';
+import {clamp} from '../components/clampSelectionBoundaries';
+import {Vector} from './types';
+
 export type Channel = 'r' | 'g' | 'b' | 'a';
 
-export type RGBColor = {
+export type RGB = {
   r: number;
   g: number;
   b: number;
 };
 
-export type RGBA<T> = {
-  [Name in Channel]: T;
+export type HSL = {
+  h: number;
+  s: number;
+  l: number;
 };
 
 const rgb2HexValues: {[id: number]: string | number} = {
@@ -48,25 +54,25 @@ const hex2RGBValues: {[id: string]: number} = {
   f: 15,
 };
 
-export const normalize = (color: RGBColor): RGBColor => {
+export const normalize = (color: RGB): RGB => {
   'worklet';
   return {
-    r: color.r / 255,
-    g: color.g / 255,
-    b: color.b / 255,
+    r: clamp(color.r / 255, 0, 255),
+    g: clamp(color.g / 255, 0, 255),
+    b: clamp(color.b / 255, 0, 255),
   };
 };
 
-export const denormalize = (color: RGBColor): RGBColor => {
+export const denormalize = (color: RGB): RGB => {
   'worklet';
   return {
-    r: color.r * 255,
-    g: color.g * 255,
-    b: color.b * 255,
+    r: clamp(color.r * 255, 0, 255),
+    g: clamp(color.g * 255, 0, 255),
+    b: clamp(color.b * 255, 0, 255),
   };
 };
 
-export const mix = (start: RGBColor, end: RGBColor, t: number): RGBColor => {
+export const mix = (start: RGB, end: RGB, t: number): RGB => {
   'worklet';
   const normalizedT = Math.max(Math.min(1, t), 0);
   const deltaR = start.r - end.r;
@@ -80,12 +86,12 @@ export const mix = (start: RGBColor, end: RGBColor, t: number): RGBColor => {
   };
 };
 
-export const rgbToString = (rgb: RGBColor, opacity?: number): string => {
+export const rgbToString = (rgb: RGB, opacity?: number): string => {
   'worklet';
   return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${opacity ?? 1})`;
 };
 
-export const rgb2Hex = (color: RGBColor): string => {
+export const rgb2Hex = (color: RGB): string => {
   'worklet';
   const r1 = rgb2HexValues[Math.floor(color.r / 16)];
   const r2 = rgb2HexValues[Math.round(color.r) % 16];
@@ -96,7 +102,7 @@ export const rgb2Hex = (color: RGBColor): string => {
   return `#${r1}${r2}${g1}${g2}${b1}${b2}`;
 };
 
-export const hex2RGB = (color: string): RGBColor => {
+export const hex2RGB = (color: string): RGB => {
   'worklet';
   const currentHex =
     color.length === 3
@@ -112,4 +118,47 @@ export const hex2RGB = (color: string): RGBColor => {
     g,
     b,
   };
+};
+
+// HSL stuff
+export const hsl2rgb = (color: HSL): RGB => {
+  'worklet';
+  const {h, s, l} = color;
+  const d = s * (1 - Math.abs(2.0 * l - 1));
+  const m = l - d / 2;
+  const x = d * (1 - Math.abs(((h / 60) % 2) - 1));
+
+  if (h >= 0.0 && h <= 60) {
+    return {r: d + m, g: x + m, b: m};
+  } else if (h >= 60 && h <= 120) {
+    return {r: x + m, g: d + m, b: m};
+  } else if (h >= 120 && h <= 180) {
+    return {r: m, g: d + m, b: x + m};
+  } else if (h >= 180 && h <= 240) {
+    return {r: m, g: x + m, b: d + m};
+  } else if (h >= 240 && h <= 300) {
+    return {r: x + m, g: m, b: d + m};
+  } else {
+    return {r: d + m, g: m, b: x + m};
+  }
+};
+
+export const xy2HSL = (xy: Vector<number>, size: number): HSL => {
+  'worklet';
+  const hue = 360 * (xy.y / size);
+  const luminosity = 1 - xy.x / size;
+
+  return {
+    h: hue,
+    s: 1,
+    l: luminosity,
+  };
+};
+
+export const hsl2xy = (color: HSL, size: number): Vector<number> => {
+  'worklet';
+  const y = interpolate(color.h, [0, 360], [0, size], Extrapolate.CLAMP);
+  const x = interpolate(color.l, [1, 0], [0, size], Extrapolate.CLAMP);
+
+  return {x, y};
 };

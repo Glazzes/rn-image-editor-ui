@@ -1,9 +1,23 @@
-import {useWindowDimensions, ViewStyle} from 'react-native';
+import {StyleSheet, useWindowDimensions, View, ViewStyle} from 'react-native';
 import React from 'react';
 import {Canvas, Fill, Shader, Skia} from '@shopify/react-native-skia';
+import Animated, {
+  useAnimatedReaction,
+  useAnimatedStyle,
+  useDerivedValue,
+} from 'react-native-reanimated';
+import {denormalize, hsl2rgb, rgbToString, xy2HSL} from '../utils/colors';
+import {Gesture, GestureDetector} from 'react-native-gesture-handler';
+import {useVector} from '../utils/useVector';
+import {clamp} from './clampSelectionBoundaries';
+import {Vector} from '../utils/types';
+import {PICKER_SIZE} from './colorPicker/constants';
 
-type HSLSpectrumProps = {};
+type HSLSpectrumProps = {
+  currentColor: Animated.SharedValue<string>;
+};
 
+const INDICATOR_SIZE = 30;
 const PADDING = 16;
 
 // Formula from https://www.had2know.org/technology/hsl-rgb-color-converter.html
@@ -35,11 +49,11 @@ const shader = Skia.RuntimeEffect.Make(`
     float saturation = 1.0;
     float luminosity = 1.0 - (xy.x / size);
 
-    vec3 color = hsl2RGB(hue, 1.0, luminosity);
+    vec3 color = hsl2RGB(hue, saturation, luminosity);
     return vec4(color, 1.0);
   }`)!;
 
-const HSLSpectrum: React.FC<HSLSpectrumProps> = ({}) => {
+const HSLSpectrum: React.FC<HSLSpectrumProps> = ({currentColor}) => {
   const {width} = useWindowDimensions();
 
   const size = width - PADDING * 2;
@@ -48,13 +62,86 @@ const HSLSpectrum: React.FC<HSLSpectrumProps> = ({}) => {
     height: size,
   };
 
+  const translate = useVector(0);
+  const offset = useVector(0);
+
+  const translation = useDerivedValue<Vector<number>>(() => {
+    const indicatorOffest = PICKER_SIZE / 2 - INDICATOR_SIZE / 2;
+    const x = clamp(translate.x.value, -indicatorOffest, indicatorOffest);
+    const y = clamp(translate.y.value, -indicatorOffest, indicatorOffest);
+
+    return {x, y};
+  }, [translate]);
+
+  const activeColor = useDerivedValue<string>(() => {
+    const color = xy2HSL(
+      {
+        x: translation.value.x + PICKER_SIZE / 2,
+        y: translation.value.y + PICKER_SIZE / 2,
+      },
+      size - INDICATOR_SIZE / 2,
+    );
+
+    const rgb = hsl2rgb(color);
+    const denormalized = denormalize(rgb);
+    return rgbToString(denormalized);
+  }, [translation]);
+
+  const pan = Gesture.Pan()
+    .onBegin(_ => {
+      offset.x.value = translation.value.x;
+      offset.y.value = translation.value.y;
+    })
+    .onChange(e => {
+      translate.x.value = offset.x.value + e.translationX;
+      translate.y.value = offset.y.value + e.translationY;
+    });
+
+  const colorIndicatorStyle = useAnimatedStyle(() => ({
+    backgroundColor: activeColor.value,
+    transform: [
+      {translateX: translation.value.x},
+      {translateY: translation.value.y},
+    ],
+  }));
+
+  useAnimatedReaction(
+    () => activeColor.value,
+    value => {
+      currentColor.value = value;
+    },
+    [activeColor],
+  );
+
   return (
-    <Canvas style={canvasStyles}>
-      <Fill>
-        <Shader source={shader} uniforms={{size}} />
-      </Fill>
-    </Canvas>
+    <View style={styles.root}>
+      <Canvas style={canvasStyles}>
+        <Fill>
+          <Shader source={shader} uniforms={{size}} />
+        </Fill>
+      </Canvas>
+      <GestureDetector gesture={pan}>
+        <Animated.View style={[styles.colorIndicator, colorIndicatorStyle]} />
+      </GestureDetector>
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  root: {
+    width: PICKER_SIZE,
+    height: PICKER_SIZE,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  colorIndicator: {
+    position: 'absolute',
+    height: INDICATOR_SIZE,
+    width: INDICATOR_SIZE,
+    borderRadius: INDICATOR_SIZE / 2,
+    borderColor: '#ffffff',
+    borderWidth: 3,
+  },
+});
 
 export default HSLSpectrum;
