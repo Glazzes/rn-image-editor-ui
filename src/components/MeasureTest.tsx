@@ -27,6 +27,8 @@ const MeasureTest: React.FC<MeasureTestProps> = ({}) => {
         const m1 = measure(ref);
         const m2 = measure(ref2);
 
+        const rotatedCenter = 
+
         const newPos = {
           x: center.x - m2.pageX,
           y: -1 * (center.y - m2.pageY),

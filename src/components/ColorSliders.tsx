@@ -7,7 +7,7 @@ import {
   interpolate,
   useSharedValue,
 } from 'react-native-reanimated';
-import {hex2RGB, rgb2Hex} from '../utils/colors';
+import {hex2rgb, rgb2Hex} from '../utils/colors';
 import ChannelSlider from './ChannelSlider';
 import ReanimatedInput from './ReanimatedInput';
 import {useFonts} from 'expo-font';
@@ -18,6 +18,7 @@ import {
   positionOutputRange,
   SLIDER_WIDTH,
 } from './sliders/constants';
+import {PICKER_HEIGHT, PICKER_WIDTH} from './colorPicker/constants';
 
 type ColorSlidersProps = {};
 
@@ -64,7 +65,7 @@ const ColorSliders: React.FC<ColorSlidersProps> = ({}) => {
     }
 
     if (hexColor.length % 3 === 0) {
-      const rgb = hex2RGB(hexColor);
+      const rgb = hex2rgb(hexColor);
 
       translateR.value = interpolate(
         rgb.r,
@@ -108,7 +109,7 @@ const ColorSliders: React.FC<ColorSlidersProps> = ({}) => {
       return;
     }
 
-    const startRGB = hex2RGB(startColor);
+    const startRGB = hex2rgb(startColor);
     text.value = startColor;
 
     translateR.value = interpolate(
@@ -167,26 +168,18 @@ const ColorSliders: React.FC<ColorSlidersProps> = ({}) => {
           />
         </View>
       </View>
-      <ChannelSlider
-        channel={'a'}
-        translateX={translateA}
-        width={OPACITY_SLIDER_WIDTH}
-        {...sliderProps}
-      />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   root: {
-    flex: 1,
+    width: PICKER_WIDTH,
+    height: PICKER_HEIGHT,
     backgroundColor: '#222121',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   hexContainer: {
-    marginVertical: 20,
-    marginHorizontal: 16,
+    marginTop: 20,
     flexDirection: 'row',
     alignSelf: 'flex-end',
     alignItems: 'center',

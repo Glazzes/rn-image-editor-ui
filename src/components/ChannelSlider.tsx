@@ -41,8 +41,8 @@ type ChannelSliderProps = {
   a: SkiaMutableValue<number>;
 };
 
-const SLIDER_HEIGHT = 10;
-const BALL_SIZE = 28;
+const SLIDER_HEIGHT = 8;
+const BALL_SIZE = 24;
 const STROKE_WIDTH = 2;
 
 const upperPath = Skia.Path.Make();
@@ -320,7 +320,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginVertical: 5,
+    marginVertical: 4,
   },
   slider: {
     width: SLIDER_WIDTH,
@@ -347,7 +347,7 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     backgroundColor: '#545454',
-    borderRadius: 10,
+    borderRadius: 8,
     width: 50,
     height: BALL_SIZE,
     justifyContent: 'center',

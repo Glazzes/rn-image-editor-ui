@@ -1,4 +1,4 @@
-import {StyleSheet, useWindowDimensions, View, ViewStyle} from 'react-native';
+import {StyleSheet, View, ViewStyle} from 'react-native';
 import React from 'react';
 import {Canvas, Fill, Shader, Skia} from '@shopify/react-native-skia';
 import Animated, {
@@ -6,12 +6,18 @@ import Animated, {
   useAnimatedStyle,
   useDerivedValue,
 } from 'react-native-reanimated';
-import {denormalize, hsl2rgb, rgbToString, xy2HSL} from '../utils/colors';
+import {
+  denormalize,
+  hsl2rgb,
+  hsl2xy,
+  rgbToString,
+  xy2hsl,
+} from '../utils/colors';
 import {Gesture, GestureDetector} from 'react-native-gesture-handler';
 import {useVector} from '../utils/useVector';
 import {clamp} from './clampSelectionBoundaries';
 import {Vector} from '../utils/types';
-import {PICKER_SIZE} from './colorPicker/constants';
+import {PICKER_HEIGHT, PICKER_WIDTH} from './colorPicker/constants';
 
 type HSLSpectrumProps = {
   currentColor: Animated.SharedValue<string>;
@@ -22,9 +28,10 @@ const PADDING = 16;
 
 // Formula from https://www.had2know.org/technology/hsl-rgb-color-converter.html
 const shader = Skia.RuntimeEffect.Make(`
-  uniform float size;
+  uniform float width;
+  uniform float height;
 
-  vec3 hsl2RGB(float h, float s, float l) {
+  vec3 hsl2rgb(float h, float s, float l) {
     float d = s * (1.0 - abs(2.0 * l - 1.0));
     float m = l - d / 2.0;
     float x = d * (1.0 - abs(mod((h / 60), 2.0) - 1.0));
@@ -45,41 +52,42 @@ const shader = Skia.RuntimeEffect.Make(`
   }
 
   vec4 main(vec2 xy) {
-    float hue = 360 * (xy.y / size);
+    float hue = 360 * (xy.y / height);
     float saturation = 1.0;
-    float luminosity = 1.0 - (xy.x / size);
+    float luminosity = 1.0 - (xy.x / width);
 
-    vec3 color = hsl2RGB(hue, saturation, luminosity);
+    vec3 color = hsl2rgb(hue, saturation, luminosity);
     return vec4(color, 1.0);
   }`)!;
 
 const HSLSpectrum: React.FC<HSLSpectrumProps> = ({currentColor}) => {
-  const {width} = useWindowDimensions();
-
-  const size = width - PADDING * 2;
   const canvasStyles: ViewStyle = {
-    width: size,
-    height: size,
+    width: PICKER_WIDTH,
+    height: PICKER_HEIGHT,
   };
 
   const translate = useVector(0);
   const offset = useVector(0);
 
   const translation = useDerivedValue<Vector<number>>(() => {
-    const indicatorOffest = PICKER_SIZE / 2 - INDICATOR_SIZE / 2;
-    const x = clamp(translate.x.value, -indicatorOffest, indicatorOffest);
-    const y = clamp(translate.y.value, -indicatorOffest, indicatorOffest);
+    const offsetX = PICKER_WIDTH / 2 - INDICATOR_SIZE / 2;
+    const offsetY = PICKER_HEIGHT / 2 - INDICATOR_SIZE / 2;
+    const x = clamp(translate.x.value, -offsetX, offsetX);
+    const y = clamp(translate.y.value, -offsetY, offsetY);
 
     return {x, y};
   }, [translate]);
 
   const activeColor = useDerivedValue<string>(() => {
-    const color = xy2HSL(
+    const color = xy2hsl(
       {
-        x: translation.value.x + PICKER_SIZE / 2,
-        y: translation.value.y + PICKER_SIZE / 2,
+        x: translation.value.x + PICKER_WIDTH / 2 - INDICATOR_SIZE / 2,
+        y: translation.value.y + PICKER_WIDTH / 2 - INDICATOR_SIZE / 2,
       },
-      size - INDICATOR_SIZE / 2,
+      {
+        width: PICKER_WIDTH,
+        height: PICKER_HEIGHT,
+      },
     );
 
     const rgb = hsl2rgb(color);
@@ -88,6 +96,7 @@ const HSLSpectrum: React.FC<HSLSpectrumProps> = ({currentColor}) => {
   }, [translation]);
 
   const pan = Gesture.Pan()
+    .hitSlop(20)
     .onBegin(_ => {
       offset.x.value = translation.value.x;
       offset.y.value = translation.value.y;
@@ -117,7 +126,10 @@ const HSLSpectrum: React.FC<HSLSpectrumProps> = ({currentColor}) => {
     <View style={styles.root}>
       <Canvas style={canvasStyles}>
         <Fill>
-          <Shader source={shader} uniforms={{size}} />
+          <Shader
+            source={shader}
+            uniforms={{width: PICKER_WIDTH, height: PICKER_HEIGHT}}
+          />
         </Fill>
       </Canvas>
       <GestureDetector gesture={pan}>
@@ -129,10 +141,12 @@ const HSLSpectrum: React.FC<HSLSpectrumProps> = ({currentColor}) => {
 
 const styles = StyleSheet.create({
   root: {
-    width: PICKER_SIZE,
-    height: PICKER_SIZE,
+    width: PICKER_WIDTH,
+    height: PICKER_HEIGHT,
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: PADDING / 2,
+    overflow: 'hidden',
   },
   colorIndicator: {
     position: 'absolute',

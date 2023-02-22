@@ -4,9 +4,9 @@ import {HSL} from '../../utils/colors';
 const {width} = Dimensions.get('window');
 
 export const PADDING = 16;
-export const PICKER_SIZE = width - PADDING * 2;
+
 export const LUMINOSITY_PERCENTAGES = [
-  0, -0.28, -0.2, -0.125, -0.075, 0, 0.12, 0.175, 0.25, 0.32,
+  0, -0.2, -0.15, -0.1, -0.05, 0, 0.07, 0.14, 0.21, 0.28,
 ];
 
 // grid
@@ -25,5 +25,6 @@ export const GRID_COLORS: HSL[] = [
   {h: 93, s: 0.49, l: 0.49},
 ];
 
-export const GRID_CELL_WIDTH = Math.round(PICKER_SIZE / 12);
-export const GRID_CELL_HEIGHT = Math.round(PICKER_SIZE / 10);
+export const PICKER_WIDTH = width - PADDING * 2;
+export const GRID_CELL_SIZE = Math.round(PICKER_WIDTH / 12);
+export const PICKER_HEIGHT = GRID_CELL_SIZE * 10;

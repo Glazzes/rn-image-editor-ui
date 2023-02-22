@@ -1,8 +1,9 @@
-import {View, StyleSheet, Dimensions} from 'react-native';
+import {StyleSheet, Dimensions} from 'react-native';
 import React from 'react';
 import Animated, {
   Extrapolate,
   interpolate,
+  useAnimatedReaction,
   useAnimatedStyle,
   useDerivedValue,
   useSharedValue,
@@ -12,27 +13,28 @@ import {Gesture, GestureDetector} from 'react-native-gesture-handler';
 import {pinch} from './pinch';
 import {clampSelectionBoundaries} from './clampSelectionBoundaries';
 import {getAxisRotationOffset} from '../utils/getAxisRotationOffset';
-import {useVector} from '../utils/useVector';
+import {useDimensions, useVector} from '../utils/useVector';
+import {Dimension} from '../utils/types';
+import Selection from './Selection';
+import {rotateDimensions} from '../utils/rotateDimensions';
 
-type ImageTestProps = {};
-
-type DimensionsType = {
+type ImageTestProps = {
+  source: any;
   width: number;
   height: number;
+  onCrop: () => void;
+  imageNativeId?: string;
+  rememberLastCrop?: boolean;
 };
 
-type ImageDimensions = {
-  base: DimensionsType;
-  selection: DimensionsType;
-  image: DimensionsType;
-};
-
-const {width} = Dimensions.get('window');
+const {width: windowWidth} = Dimensions.get('window');
 
 const WIDTH = 200;
 const aspectRatio = 1244 / 1659;
 
 const ImageTest: React.FC<ImageTestProps> = ({}) => {
+  const baseHeight = WIDTH / aspectRatio;
+
   const sliderTranslateX = useSharedValue<number>(0);
   const sliderTranslateXOffset = useSharedValue<number>(0);
 
@@ -43,56 +45,67 @@ const ImageTest: React.FC<ImageTestProps> = ({}) => {
   const scaleOffset = useSharedValue<number>(1);
 
   const origin = useVector(0, 0);
-
   const canAssignOrigin = useSharedValue<boolean>(true);
-
   const largestRecordAngle = useSharedValue<number>(0);
+
+  const deltaY = useSharedValue<number | undefined>(undefined);
 
   const angle = useDerivedValue(() => {
     return interpolate(
       sliderTranslateX.value,
-      [-1 * (width / 2 - 15), 0, width / 2 - 15],
+      [-1 * (windowWidth / 2 - 15), 0, windowWidth / 2 - 15],
       [-Math.PI / 4, 0, Math.PI / 4],
       Extrapolate.CLAMP,
     );
   }, [sliderTranslateX]);
 
-  const dimensions = useDerivedValue<ImageDimensions>(() => {
-    const baseHeight = WIDTH / aspectRatio;
+  const selectionDimensions = useDimensions(WIDTH, baseHeight);
+  const largestSelectionDimensions = useDimensions(WIDTH, baseHeight);
 
-    const currentAngle = Math.abs(angle.value);
+  useAnimatedReaction(
+    () => selectionDimensions,
+    dim => {
+      largestSelectionDimensions.width.value = Math.max(
+        largestSelectionDimensions.width.value,
+        dim.width.value,
+      );
 
-    const largestAngle = Math.max(
-      currentAngle,
-      Math.abs(largestRecordAngle.value),
+      largestSelectionDimensions.height.value = Math.max(
+        largestSelectionDimensions.height.value,
+        dim.height.value,
+      );
+    },
+  );
+
+  const rotatedSelectionDimensions = useDerivedValue<Dimension>(() => {
+    const {width, height} = rotateDimensions(
+      {
+        width: selectionDimensions.width.value,
+        height: selectionDimensions.height.value,
+      },
+      angle.value,
     );
 
-    const imageWidth =
-      baseHeight * Math.sin(largestAngle) + WIDTH * Math.cos(largestAngle);
+    return {
+      width,
+      height,
+    };
+  }, [angle, selectionDimensions]);
 
-    const imageHeight = imageWidth / aspectRatio;
+  const imageDimensions = useDerivedValue<Dimension>(() => {
+    const absAngle = Math.abs(angle.value);
+    const largestAngle = Math.max(absAngle, Math.abs(largestRecordAngle.value));
+    const width =
+      largestSelectionDimensions.height.value * Math.sin(largestAngle) +
+      largestSelectionDimensions.width.value * Math.cos(largestAngle);
 
-    const selectionWidth =
-      baseHeight * Math.sin(currentAngle) + WIDTH * Math.cos(currentAngle);
-
-    const selectionHeight =
-      baseHeight * Math.cos(currentAngle) + WIDTH * Math.sin(currentAngle);
+    const height = width / aspectRatio;
 
     return {
-      base: {
-        width: WIDTH,
-        height: baseHeight,
-      },
-      image: {
-        width: imageWidth,
-        height: imageHeight,
-      },
-      selection: {
-        width: selectionWidth,
-        height: selectionHeight,
-      },
+      width,
+      height,
     };
-  }, [angle]);
+  }, [angle, largestRecordAngle, largestSelectionDimensions]);
 
   const sliderPan = Gesture.Pan()
     .onStart(_ => {
@@ -103,8 +116,8 @@ const ImageTest: React.FC<ImageTestProps> = ({}) => {
 
       const {x, y} = clampSelectionBoundaries({
         translate: {x: translate.x.value, y: translate.y.value},
-        imageDimensions: dimensions.value.image,
-        selectionDimensions: dimensions.value.selection,
+        imageDimensions: imageDimensions.value,
+        selectionDimensions: rotatedSelectionDimensions.value,
         scale: scale.value,
       });
 
@@ -122,6 +135,8 @@ const ImageTest: React.FC<ImageTestProps> = ({}) => {
 
       translateOffset.x.value = translate.x.value;
       translateOffset.y.value = translate.y.value;
+
+      deltaY.value = undefined;
     })
     .onChange(({translationX, translationY}) => {
       const {x: offsetXForY, y: offsetYForX} = getAxisRotationOffset(
@@ -136,8 +151,8 @@ const ImageTest: React.FC<ImageTestProps> = ({}) => {
     .onEnd(_ => {
       const {x, y} = clampSelectionBoundaries({
         translate: {x: translate.x.value, y: translate.y.value},
-        imageDimensions: dimensions.value.image,
-        selectionDimensions: dimensions.value.selection,
+        imageDimensions: imageDimensions.value,
+        selectionDimensions: rotatedSelectionDimensions.value,
         scale: scale.value,
       });
 
@@ -157,8 +172,8 @@ const ImageTest: React.FC<ImageTestProps> = ({}) => {
       const {translateX, translateY} = pinch({
         event: e,
         center: {
-          x: dimensions.value.image.width / 2,
-          y: dimensions.value.image.height / 2,
+          x: imageDimensions.value.width / 2,
+          y: imageDimensions.value.height / 2,
         },
         offset: {
           x: translateOffset.x.value,
@@ -179,8 +194,8 @@ const ImageTest: React.FC<ImageTestProps> = ({}) => {
 
       const {x, y} = clampSelectionBoundaries({
         translate: {x: translate.x.value, y: translate.y.value},
-        imageDimensions: dimensions.value.image,
-        selectionDimensions: dimensions.value.selection,
+        imageDimensions: imageDimensions.value,
+        selectionDimensions: rotatedSelectionDimensions.value,
         scale: toScale,
       });
 
@@ -192,8 +207,8 @@ const ImageTest: React.FC<ImageTestProps> = ({}) => {
 
   const imageStyles = useAnimatedStyle(() => {
     return {
-      width: dimensions.value.image.width,
-      height: dimensions.value.image.height,
+      width: imageDimensions.value.width,
+      height: imageDimensions.value.height,
       transform: [
         {rotate: `${angle.value}rad`},
         {translateX: translate.x.value},
@@ -214,7 +229,15 @@ const ImageTest: React.FC<ImageTestProps> = ({}) => {
         />
       </GestureDetector>
 
-      <View style={styles.selection} pointerEvents={'none'} />
+      <Selection
+        rotatedDimensions={rotatedSelectionDimensions}
+        imageDimensions={imageDimensions}
+        dimensions={selectionDimensions}
+        translateImage={translate}
+        deltaY={deltaY}
+        scale={scale}
+        angle={angle}
+      />
 
       <GestureDetector gesture={sliderPan}>
         <Animated.View style={styles.ball} />
@@ -229,13 +252,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  selection: {
-    position: 'absolute',
-    borderWidth: 2,
-    borderColor: 'lime',
-    width: 200,
-    height: 200 / aspectRatio,
   },
   ball: {
     position: 'absolute',

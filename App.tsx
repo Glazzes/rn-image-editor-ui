@@ -11,6 +11,7 @@ import MeasureTest from './src/components/MeasureTest';
 import HSLSpectrum from './src/components/HSLSpectrum';
 import ColorGrid from './src/components/ColorGrid';
 import ColorPicker from './src/components/colorPicker/ColorPicker';
+import EmojiSticker from './src/components/EmojiSticker';
 
 type StackParamList = {
   Home: undefined;
@@ -27,7 +28,7 @@ const App = () => {
         screenOptions={{
           headerShown: false,
         }}>
-        <Stack.Screen name="Home" component={ColorPicker} />
+        <Stack.Screen name="Home" component={ImageTest} />
       </Stack.Navigator>
     </NavigationContainer>
   );

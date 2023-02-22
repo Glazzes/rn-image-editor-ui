@@ -1,6 +1,6 @@
 import {Extrapolate, interpolate} from 'react-native-reanimated';
 import {clamp} from '../components/clampSelectionBoundaries';
-import {Vector} from './types';
+import {Dimension, Vector} from './types';
 
 export type Channel = 'r' | 'g' | 'b' | 'a';
 
@@ -102,7 +102,7 @@ export const rgb2Hex = (color: RGB): string => {
   return `#${r1}${r2}${g1}${g2}${b1}${b2}`;
 };
 
-export const hex2RGB = (color: string): RGB => {
+export const hex2rgb = (color: string): RGB => {
   'worklet';
   const currentHex =
     color.length === 3
@@ -120,7 +120,9 @@ export const hex2RGB = (color: string): RGB => {
   };
 };
 
-// HSL stuff
+/**
+ * Turns an HSL color into an RGB color whose values range from 0 to 1
+ */
 export const hsl2rgb = (color: HSL): RGB => {
   'worklet';
   const {h, s, l} = color;
@@ -128,7 +130,7 @@ export const hsl2rgb = (color: HSL): RGB => {
   const m = l - d / 2;
   const x = d * (1 - Math.abs(((h / 60) % 2) - 1));
 
-  if (h >= 0.0 && h <= 60) {
+  if (h >= 0 && h <= 60) {
     return {r: d + m, g: x + m, b: m};
   } else if (h >= 60 && h <= 120) {
     return {r: x + m, g: d + m, b: m};
@@ -143,10 +145,15 @@ export const hsl2rgb = (color: HSL): RGB => {
   }
 };
 
-export const xy2HSL = (xy: Vector<number>, size: number): HSL => {
+/**
+ * Turns a pair of x and y coordinates into an HSL color. Hue is calculated from y cooridante from
+ * 0 to dimensions's height. Luminosity is calculated from x coordinate from 0 to dimensions's width.
+ * Saturation is always 1.0
+ */
+export const xy2hsl = (xy: Vector<number>, dimension: Dimension): HSL => {
   'worklet';
-  const hue = 360 * (xy.y / size);
-  const luminosity = 1 - xy.x / size;
+  const hue = 360 * (xy.y / dimension.height);
+  const luminosity = 1 - xy.x / dimension.width;
 
   return {
     h: hue,
@@ -155,10 +162,26 @@ export const xy2HSL = (xy: Vector<number>, size: number): HSL => {
   };
 };
 
-export const hsl2xy = (color: HSL, size: number): Vector<number> => {
+/**
+ * Given a color in hsl color model, will return it's position in the given dimensions
+ * turning the hue into the Y coordinate and luminosity into the X coordinate, saturation
+ * it's always treated as 1.0
+ */
+export const hsl2xy = (color: HSL, dimensions: Dimension): Vector<number> => {
   'worklet';
-  const y = interpolate(color.h, [0, 360], [0, size], Extrapolate.CLAMP);
-  const x = interpolate(color.l, [1, 0], [0, size], Extrapolate.CLAMP);
+  const x = interpolate(
+    color.l,
+    [1, 0],
+    [0, dimensions.width],
+    Extrapolate.CLAMP,
+  );
+
+  const y = interpolate(
+    color.h,
+    [0, 360],
+    [0, dimensions.height],
+    Extrapolate.CLAMP,
+  );
 
   return {x, y};
 };

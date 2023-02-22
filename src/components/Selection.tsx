@@ -1,117 +1,48 @@
-import {View, StyleSheet, Dimensions} from 'react-native';
-import React, {useRef} from 'react';
+import {StyleSheet} from 'react-native';
+import React from 'react';
 import Animated, {
-  measure,
-  useAnimatedRef,
   useAnimatedStyle,
-  useDerivedValue,
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
 import {useDimensions, useVector} from '../utils/useVector';
 import {Gesture, GestureDetector} from 'react-native-gesture-handler';
-import {Dimension, Vector} from '../utils/types';
-import {clamp} from './clampSelectionBoundaries';
+import {Dimension, TypeDimensions, Vector} from '../utils/types';
+import {getAxisRotationOffset} from '../utils/getAxisRotationOffset';
+import {rotateDimensions} from '../utils/rotateDimensions';
 
-type SelectionProps = {};
-
-type GestureState = {
-  isXUpdated: boolean;
-  isYUpdated: boolean;
+type SelectionProps = {
+  imageDimensions: Readonly<Animated.SharedValue<Dimension>>;
+  rotatedDimensions: Readonly<Animated.SharedValue<Dimension>>;
+  dimensions: TypeDimensions<Animated.SharedValue<number>>;
+  translateImage: Vector<Animated.SharedValue<number>>;
+  deltaY: Animated.SharedValue<number | undefined>;
+  scale: Animated.SharedValue<number>;
+  angle: Animated.SharedValue<number>;
 };
 
-const {width: windowWidth} = Dimensions.get('window');
 const WIDTH = 200;
-const RATIO = 1244 / 1659;
 
-const Selection: React.FC<SelectionProps> = ({}) => {
-  const state = useRef<GestureState>({
-    isXUpdated: false,
-    isYUpdated: false,
-  });
-
+const Selection: React.FC<SelectionProps> = ({
+  angle,
+  scale,
+  deltaY,
+  dimensions,
+  translateImage,
+  imageDimensions,
+  rotatedDimensions,
+}) => {
   const translate = useVector(0, 0);
-  const translateImage = useVector(0, 0);
-  const translateImageOffset = useVector(0, 0);
-  const scale = useSharedValue<number>(1);
-
-  const largestWidth = useSharedValue<number>(WIDTH);
-  const maxAchievableWidthIncrease = useSharedValue<number>(
-    (windowWidth - WIDTH) / 2,
-  );
-
-  const dimensions = useDimensions(WIDTH, WIDTH / RATIO);
   const dimensionsOffset = useDimensions(0, 0);
 
-  const imageDimensions = useDerivedValue<Dimension>(() => {
-    const width = Math.max(largestWidth.value, WIDTH);
-    const height = width / RATIO;
+  const largestWidth = useSharedValue<number>(WIDTH);
 
-    return {width, height};
-  }, [largestWidth]);
+  const rightBound = useSharedValue<number>(0);
+  const leftBound = useSharedValue<number>(0);
+  const upperBound = useSharedValue<number>(0);
+  const lowerBound = useSharedValue<number>(0);
 
-  const imageTranslation = useDerivedValue<Vector<number>>(() => {
-    const offsetX = (imageDimensions.value.width - dimensions.width.value) / 2;
-    const offsetY =
-      (imageDimensions.value.height - dimensions.height.value) / 2;
-
-    const x = clamp(translateImage.x.value, -1 * offsetX, offsetX);
-    const y = clamp(translateImage.y.value, -1 * offsetY, offsetY);
-
-    return {x, y};
-  }, [imageDimensions, dimensions, translateImage]);
-
-  const imagePanGesture = Gesture.Pan()
-    .onStart(_ => {
-      translateImageOffset.x.value = imageTranslation.value.x;
-      translateImageOffset.y.value = imageTranslation.value.y;
-    })
-    .onChange(({translationX, translationY}) => {
-      translateImage.x.value = translateImageOffset.x.value + translationX;
-      translateImage.y.value = translateImageOffset.y.value + translationY;
-    });
-
-  const horizontalPan = Gesture.Pan()
-    .onStart(_ => {
-      maxAchievableWidthIncrease.value =
-        (windowWidth - dimensions.width.value) / 2;
-
-      dimensionsOffset.width.value = dimensions.width.value;
-    })
-    .onChange(({translationX}) => {
-      const moveToX = Math.min(
-        translationX / 2,
-        maxAchievableWidthIncrease.value / 2,
-      );
-
-      translate.x.value = moveToX;
-      translateImage.x.value = Math.max(translateImage.x.value, moveToX);
-
-      dimensions.width.value =
-        dimensionsOffset.width.value +
-        Math.min(translationX, maxAchievableWidthIncrease.value);
-
-      largestWidth.value = Math.max(largestWidth.value, dimensions.width.value);
-    })
-    .onEnd(_ => {
-      translateImage.x.value = withTiming(
-        translateImage.x.value - translate.x.value,
-      );
-
-      translate.x.value = withTiming(0);
-      /*
-      const x = WIDTH - dimensions.width.value;
-      translate.x.value = withTiming(x / 2);
-      const toX = dimensionsOffset.width.value - dimensions.width.value;
-      translateImage.x.value = withTiming(translateImage.x.value + toX / 2);
-      */
-    });
-
-  const imageRef = useAnimatedRef<Animated.Image>();
-  const selectionRef = useAnimatedRef<Animated.View>();
-
-  const rightOffset = useSharedValue<number>(0);
-  const leftOffset = useSharedValue<number>(0);
+  const rotatedOffset = useDimensions(0, 0);
 
   const largestTranslate = useVector(0, 0);
 
@@ -123,21 +54,32 @@ const Selection: React.FC<SelectionProps> = ({}) => {
   */
   const extraOffset = useSharedValue<number>(0);
 
-  const measureHorizontalOffsets = () => {
+  const measureBounds = () => {
     'worklet';
-    const selectionMeasure = measure(selectionRef);
-    const imageMeasure = measure(imageRef);
+    const offsetX =
+      (imageDimensions.value.width * scale.value -
+        rotatedDimensions.value.width) /
+      2;
 
-    leftOffset.value =
-      imageMeasure.pageX < 0
-        ? Math.abs(imageMeasure.pageX) + selectionMeasure.pageX
-        : selectionMeasure.pageX - imageMeasure.pageX;
+    const offsetY =
+      (imageDimensions.value.height * scale.value -
+        rotatedDimensions.value.height) /
+      2;
 
-    rightOffset.value =
-      Math.round(imageMeasure.width) -
-      Math.round(selectionMeasure.width) -
-      leftOffset.value;
+    rightBound.value = offsetX + translateImage.x.value;
+    leftBound.value =
+      imageDimensions.value.width -
+      rightBound.value -
+      rotatedDimensions.value.width;
 
+    lowerBound.value = offsetY + translateImage.y.value;
+    upperBound.value =
+      imageDimensions.value.height -
+      lowerBound.value -
+      rotatedDimensions.value.height;
+
+    rotatedOffset.width.value = rotatedDimensions.value.width;
+    rotatedOffset.height.value = rotatedDimensions.value.height;
     dimensionsOffset.width.value = dimensions.width.value;
   };
 
@@ -146,45 +88,69 @@ const Selection: React.FC<SelectionProps> = ({}) => {
     extraOffset.value = 0;
     largestTranslate.x.value = 0;
 
-    translate.x.value = withTiming(0);
-    translateImage.x.value = withTiming(
-      translateImage.x.value - translate.x.value,
+    const {y} = getAxisRotationOffset(
+      translateImage.x.value - translate.x.value * Math.cos(angle.value),
+      0,
+      angle.value,
     );
+
+    deltaY.value = y;
+
+    translateImage.x.value = withTiming(
+      translateImage.x.value - translate.x.value * Math.cos(angle.value),
+    );
+
+    translateImage.y.value = withTiming(deltaY.value ?? 0);
+
+    translate.x.value = withTiming(0);
   };
 
   const rightPan = Gesture.Pan()
     .maxPointers(1)
-    .onStart(measureHorizontalOffsets)
+    .onStart(measureBounds)
     .onChange(({translationX, changeX}) => {
-      const maxOffset =
-        leftOffset.value + rightOffset.value + extraOffset.value;
-
-      const actualRightOffset = rightOffset.value + extraOffset.value;
-
-      translate.x.value += changeX / 2;
       dimensions.width.value = dimensionsOffset.width.value + translationX;
+      translate.x.value += changeX / 2;
+
+      const {width, height} = rotateDimensions(
+        {
+          width: dimensions.width.value,
+          height: dimensions.height.value,
+        },
+        angle.value,
+      );
 
       if (
-        translationX >= actualRightOffset &&
-        translationX <= leftOffset.value &&
-        translationX >= largestTranslate.x.value
+        width >= rotatedOffset.width.value + rightBound.value &&
+        width <= imageDimensions.value.width &&
+        translationX > largestTranslate.x.value
       ) {
-        translateImage.x.value = Math.max(
-          translateImage.x.value,
-          translateImage.x.value + changeX,
-        );
+        translateImage.x.value += changeX * Math.cos(angle.value);
       }
 
-      if (translationX > maxOffset) {
-        translateImage.x.value = Math.max(
-          translateImage.x.value,
-          translateImage.x.value + changeX / 2,
-        );
-
-        extraOffset.value += changeX;
+      if (
+        height >= rotatedOffset.height.value + lowerBound.value &&
+        translationX > largestTranslate.x.value &&
+        Math.sign(angle.value) === -1 &&
+        Math.sign(translateImage.y.value) === -1
+      ) {
+        translateImage.y.value += (changeX / 2) * Math.cos(angle.value);
       }
 
-      largestWidth.value = Math.max(largestWidth.value, dimensions.width.value);
+      if (
+        height >= rotatedOffset.height.value + upperBound.value &&
+        translationX > largestTranslate.x.value &&
+        Math.sign(angle.value) === 1 &&
+        Math.sign(translateImage.y.value) === 1
+      ) {
+        translateImage.y.value -= (changeX / 2) * Math.cos(angle.value);
+      }
+
+      if (width >= imageDimensions.value.width) {
+        translateImage.x.value += (changeX / 2) * Math.cos(angle.value);
+      }
+
+      // largestWidth.value = Math.max(largestWidth.value, dimensions.width.value);
       largestTranslate.x.value = Math.max(
         translationX,
         largestTranslate.x.value,
@@ -194,22 +160,20 @@ const Selection: React.FC<SelectionProps> = ({}) => {
 
   const leftPan = Gesture.Pan()
     .maxPointers(1)
-    .onStart(measureHorizontalOffsets)
+    .onStart(measureBounds)
     .onChange(({translationX, changeX}) => {
-      const normalizedTranslation = -1 * translationX;
-      const maxOffset =
-        leftOffset.value + rightOffset.value + extraOffset.value;
-
-      const actualLeftOffset = leftOffset.value + extraOffset.value;
+      const inverseTranslation = -1 * translationX;
+      const maxOffset = leftBound.value + rightBound.value + extraOffset.value;
+      const actualLeftOffset = leftBound.value + extraOffset.value;
 
       translate.x.value += changeX / 2;
       dimensions.width.value =
-        dimensionsOffset.width.value + normalizedTranslation;
+        dimensionsOffset.width.value + inverseTranslation;
 
       if (
-        normalizedTranslation >= actualLeftOffset &&
-        normalizedTranslation >= largestTranslate.x.value &&
-        normalizedTranslation <= maxOffset
+        inverseTranslation >= actualLeftOffset &&
+        inverseTranslation >= largestTranslate.x.value &&
+        inverseTranslation <= maxOffset
       ) {
         translateImage.x.value = Math.min(
           translateImage.x.value,
@@ -217,7 +181,7 @@ const Selection: React.FC<SelectionProps> = ({}) => {
         );
       }
 
-      if (normalizedTranslation >= maxOffset) {
+      if (inverseTranslation >= maxOffset) {
         translateImage.x.value = Math.min(
           translateImage.x.value,
           translateImage.x.value + changeX / 2,
@@ -231,35 +195,17 @@ const Selection: React.FC<SelectionProps> = ({}) => {
 
       largestWidth.value = Math.max(largestWidth.value, dimensions.width.value);
       largestTranslate.x.value = Math.max(
-        normalizedTranslation,
+        inverseTranslation,
         largestTranslate.x.value,
       );
     })
     .onEnd(onEndHorizontalPan);
 
-  const verticalPan = Gesture.Pan()
-    .onStart(_ => {
-      dimensionsOffset.height.value = dimensions.height.value;
-    })
-    .onChange(({translationY}) => {
-      dimensions.height.value = dimensionsOffset.height.value + translationY;
-    })
-    .onEnd(_ => {
-      const moveSelectionToY = WIDTH / RATIO - dimensions.height.value;
-      translate.y.value = withTiming(moveSelectionToY / 2);
-
-      const moveImageToY =
-        (dimensionsOffset.height.value - dimensions.height.value) / 2;
-      translateImage.y.value = withTiming(
-        translateImage.y.value + moveImageToY,
-      );
-
-      state.current.isYUpdated = true;
-    });
-
   const selectionStyles = useAnimatedStyle(() => {
     return {
-      backgroundColor: 'rgba(252, 3, 236, 0.4)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: 'rgba(0, 0, 255, 0.4)',
       width: dimensions.width.value,
       height: dimensions.height.value,
       transform: [
@@ -269,50 +215,26 @@ const Selection: React.FC<SelectionProps> = ({}) => {
     };
   });
 
-  const imageStyles = useAnimatedStyle(() => {
+  const test = useAnimatedStyle(() => {
     return {
-      width: imageDimensions.value.width,
-      height: imageDimensions.value.height,
-      transform: [
-        {translateX: translateImage.x.value},
-        {translateY: translateImage.y.value},
-        // {translateX: imageTranslation.value.x},
-        // {translateY: imageTranslation.value.y},
-        {scale: scale.value},
-      ],
+      borderWidth: 3,
+      borderColor: 'orange',
+      width: rotatedDimensions.value.width,
+      height: rotatedDimensions.value.height,
+      transform: [{rotate: `${angle.value}rad`}],
     };
   });
 
   return (
-    <View style={styles.root}>
-      <Animated.Image
-        ref={imageRef}
-        source={require('../assets/dalmatian.jpg')}
-        style={[styles.image, imageStyles]}
-      />
-
-      <GestureDetector gesture={rightPan}>
-        <Animated.View
-          ref={selectionRef}
-          style={[styles.selection, selectionStyles]}
-        />
-      </GestureDetector>
-    </View>
+    <GestureDetector gesture={rightPan}>
+      <Animated.View style={[styles.selection, selectionStyles]}>
+        <Animated.View style={[styles.selection, test]} />
+      </Animated.View>
+    </GestureDetector>
   );
 };
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: '#000',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  image: {
-    width: WIDTH,
-    height: WIDTH / RATIO,
-    position: 'absolute',
-  },
   selection: {
     position: 'absolute',
   },

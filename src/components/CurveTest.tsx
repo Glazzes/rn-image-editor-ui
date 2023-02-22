@@ -31,7 +31,7 @@ const shader = Skia.RuntimeEffect.Make(`
     const float TAU = 6.283185307179586;
 
     vec4 main(vec2 xy) {
-      float angle = (mod(time, 3000) / 3000) * TAU; 
+      float angle = time * TAU; 
 
       xy -= vec2(160);
       xy *= mat2(cos(angle), -1.0 * sin(angle), sin(angle), cos(angle));
@@ -40,7 +40,7 @@ const shader = Skia.RuntimeEffect.Make(`
       float color = step(100, xy.x) * step(xy.x, 220) * step(100, xy.y) * step(xy.y, 220);
       vec3 mixed = mix(
         vec3(0.2, 0.45, 1.0),
-        vec3(1.0),
+        vec3(1.0, 0.0, 0.0),
         (xy.x - 120) / 100
       );
       
@@ -56,7 +56,11 @@ const CurveTest: React.FC<CurveTestProps> = ({}) => {
   const time = useClockValue();
   time.start();
 
-  const uniforms = useComputedValue(() => ({time: time.current}), [time]);
+  const modTime = useComputedValue(() => {
+    return (time.current % 3000) / 3000;
+  }, [time]);
+
+  const uniforms = useComputedValue(() => ({time: modTime.current}), [time]);
 
   const onTouch = useTouchHandler({
     onStart: _ => {

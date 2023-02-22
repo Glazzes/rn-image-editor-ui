@@ -1,18 +1,14 @@
 import {View, Dimensions, StyleSheet} from 'react-native';
-import React, {useState} from 'react';
+import React from 'react';
 import {
   Canvas,
   Circle,
-  Fill,
   interpolateColors,
   LinearGradient,
-  Path,
   RoundedRect,
-  Skia,
   SkPath,
   useComputedValue,
   useSharedValueEffect,
-  useTouchHandler,
   useValue,
   vec,
 } from '@shopify/react-native-skia';
@@ -30,13 +26,8 @@ import {useVector} from '../utils/useVector';
 
 type ColorSliderProps = {};
 
-type FreeHandStroke = {
-  path: SkPath;
-  color: Float32Array;
-};
-
 const {width, height} = Dimensions.get('window');
-const SIZE = 15;
+const SIZE = 13;
 const SLIDER_WIDTH = width * 0.7;
 
 const colors = [
@@ -58,19 +49,10 @@ const colorInputRange = colors.map((_, index) => {
 });
 
 const ColorSlider: React.FC<ColorSliderProps> = ({}) => {
-  const [strokes, setStrokes] = useState<FreeHandStroke[]>([]);
-
   const skiaTranslate = useValue<number>(0);
   const translate = useVector(0, 0);
   const offsetX = useSharedValue<number>(0);
   const scale = useSharedValue<number>(1);
-
-  // logic stuff
-  const removeLastStroke = () => {
-    setStrokes(strks => {
-      return strks.slice(0, strks.length - 1);
-    });
-  };
 
   // animation stuff
   const color = useComputedValue(() => {
@@ -119,29 +101,6 @@ const ColorSlider: React.FC<ColorSliderProps> = ({}) => {
   useSharedValueEffect(() => {
     skiaTranslate.current = translate.x.value;
   }, translate.x);
-
-  // shit to delete
-  const temporalPath = Skia.Path.Make();
-  const touchHandler = useTouchHandler(
-    {
-      onStart: ({x, y}) => {
-        temporalPath.reset();
-        temporalPath.moveTo(x, y);
-      },
-      onActive: ({x, y}) => {
-        temporalPath.lineTo(x, y);
-      },
-      onEnd: _ => {
-        const stroke: FreeHandStroke = {
-          path: temporalPath.copy(),
-          color: color.current,
-        };
-
-        setStrokes(strks => [...strks, stroke]);
-      },
-    },
-    [strokes],
-  );
 
   return (
     <View style={styles.flex}>
