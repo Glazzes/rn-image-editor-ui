@@ -120,12 +120,18 @@ const Selection: React.FC<SelectionProps> = ({
         angle.value,
       );
 
+      const deltaX = changeX * Math.cos(angle.value);
+      const deltaY = changeX * Math.sin(angle.value);
       if (
         width >= rotatedOffset.width.value + rightBound.value &&
         width <= imageDimensions.value.width &&
         translationX > largestTranslate.x.value
       ) {
-        translateImage.x.value += changeX * Math.cos(angle.value);
+        translateImage.x.value += deltaX;
+      }
+
+      if (width >= imageDimensions.value.width) {
+        translateImage.x.value += deltaX / 2;
       }
 
       if (
@@ -134,7 +140,7 @@ const Selection: React.FC<SelectionProps> = ({
         Math.sign(angle.value) === -1 &&
         Math.sign(translateImage.y.value) === -1
       ) {
-        translateImage.y.value += (changeX / 2) * Math.cos(angle.value);
+        translateImage.y.value += (changeX / 2) * Math.sin(angle.value);
       }
 
       if (
@@ -143,11 +149,7 @@ const Selection: React.FC<SelectionProps> = ({
         Math.sign(angle.value) === 1 &&
         Math.sign(translateImage.y.value) === 1
       ) {
-        translateImage.y.value -= (changeX / 2) * Math.cos(angle.value);
-      }
-
-      if (width >= imageDimensions.value.width) {
-        translateImage.x.value += (changeX / 2) * Math.cos(angle.value);
+        translateImage.y.value -= (changeX / 2) * Math.sin(angle.value);
       }
 
       // largestWidth.value = Math.max(largestWidth.value, dimensions.width.value);
