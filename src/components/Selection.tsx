@@ -35,24 +35,13 @@ const Selection: React.FC<SelectionProps> = ({
   const translate = useVector(0, 0);
   const dimensionsOffset = useDimensions(0, 0);
 
-  const largestWidth = useSharedValue<number>(WIDTH);
-
   const rightBound = useSharedValue<number>(0);
   const leftBound = useSharedValue<number>(0);
   const upperBound = useSharedValue<number>(0);
   const lowerBound = useSharedValue<number>(0);
 
   const rotatedOffset = useDimensions(0, 0);
-
   const largestTranslate = useVector(0, 0);
-
-  /*
-    When shrinking and expanding the dynamic selection beyond its original dimensions
-    will result in additional offset according to the current selection width and
-    the largest image's width recorded, this value aims to keep the image in a static position
-    as the gesture is active
-  */
-  const extraOffset = useSharedValue<number>(0);
 
   const measureBounds = () => {
     'worklet';
@@ -83,25 +72,19 @@ const Selection: React.FC<SelectionProps> = ({
     dimensionsOffset.width.value = dimensions.width.value;
   };
 
+  const onChangeHorizontal = (
+    translationX: number,
+    changeX: number,
+    inverted: boolean
+  ) => {
+     const sign = inverted ? -1 : 1;
+     const translateX = sign * translationX;
+  }
+
   const onEndHorizontalPan = () => {
     'worklet';
-    extraOffset.value = 0;
     largestTranslate.x.value = 0;
-
-    const {y} = getAxisRotationOffset(
-      translateImage.x.value - translate.x.value * Math.cos(angle.value),
-      0,
-      angle.value,
-    );
-
-    deltaY.value = y;
-
-    translateImage.x.value = withTiming(
-      translateImage.x.value - translate.x.value * Math.cos(angle.value),
-    );
-
-    translateImage.y.value = withTiming(deltaY.value ?? 0);
-
+    translateImage.x.value = withTiming(translateImage.x.value - translate.x.value);
     translate.x.value = withTiming(0);
   };
 
@@ -110,7 +93,6 @@ const Selection: React.FC<SelectionProps> = ({
     .onStart(measureBounds)
     .onChange(({translationX, changeX}) => {
       dimensions.width.value = dimensionsOffset.width.value + translationX;
-      translate.x.value += changeX / 2;
 
       const {width, height} = rotateDimensions(
         {
@@ -130,29 +112,22 @@ const Selection: React.FC<SelectionProps> = ({
         translateImage.x.value += deltaX;
       }
 
-      if (width >= imageDimensions.value.width) {
+      if (width > imageDimensions.value.width) {
         translateImage.x.value += deltaX / 2;
       }
 
-      if (
-        height >= rotatedOffset.height.value + lowerBound.value &&
-        translationX > largestTranslate.x.value &&
-        Math.sign(angle.value) === -1 &&
-        Math.sign(translateImage.y.value) === -1
-      ) {
-        translateImage.y.value += (changeX / 2) * Math.sin(angle.value);
+      const haveAngleAndTranslateYSameSign = Math.sign(angle.value) === Math.sign(translateImage.y.value);    
+      const hasGoneBeyondUpperBound = height >= rotatedOffset.height.value + upperBound.value;
+      const hasGoneBeyondLowerBound = height >= rotatedOffset.height.value + lowerBound.value;
+      if(
+        haveAngleAndTranslateYSameSign &&
+        (hasGoneBeyondLowerBound || hasGoneBeyondUpperBound) &&
+        translationX >= largestTranslate.x.value
+      ){
+        translateImage.y.value -= deltaY;
       }
 
-      if (
-        height >= rotatedOffset.height.value + upperBound.value &&
-        translationX > largestTranslate.x.value &&
-        Math.sign(angle.value) === 1 &&
-        Math.sign(translateImage.y.value) === 1
-      ) {
-        translateImage.y.value -= (changeX / 2) * Math.sin(angle.value);
-      }
-
-      // largestWidth.value = Math.max(largestWidth.value, dimensions.width.value);
+      translate.x.value += changeX / 2;
       largestTranslate.x.value = Math.max(
         translationX,
         largestTranslate.x.value,
@@ -165,41 +140,43 @@ const Selection: React.FC<SelectionProps> = ({
     .onStart(measureBounds)
     .onChange(({translationX, changeX}) => {
       const inverseTranslation = -1 * translationX;
-      const maxOffset = leftBound.value + rightBound.value + extraOffset.value;
-      const actualLeftOffset = leftBound.value + extraOffset.value;
-
       translate.x.value += changeX / 2;
-      dimensions.width.value =
-        dimensionsOffset.width.value + inverseTranslation;
+      dimensions.width.value = dimensionsOffset.width.value + inverseTranslation;
 
-      if (
-        inverseTranslation >= actualLeftOffset &&
-        inverseTranslation >= largestTranslate.x.value &&
-        inverseTranslation <= maxOffset
-      ) {
-        translateImage.x.value = Math.min(
-          translateImage.x.value,
-          translateImage.x.value + changeX,
-        );
-      }
-
-      if (inverseTranslation >= maxOffset) {
-        translateImage.x.value = Math.min(
-          translateImage.x.value,
-          translateImage.x.value + changeX / 2,
-        );
-
-        extraOffset.value = Math.max(
-          extraOffset.value,
-          extraOffset.value + -1 * changeX,
-        );
-      }
-
-      largestWidth.value = Math.max(largestWidth.value, dimensions.width.value);
-      largestTranslate.x.value = Math.max(
-        inverseTranslation,
-        largestTranslate.x.value,
+      const {width, height} = rotateDimensions(
+        {
+          width: dimensions.width.value,
+          height: dimensions.height.value,
+        },
+        angle.value,
       );
+
+      const deltaX = changeX * Math.cos(angle.value);
+      const deltaY = changeX * Math.sin(angle.value);
+      if (
+        width >= rotatedOffset.width.value + leftBound.value &&
+        width <= imageDimensions.value.width &&
+        inverseTranslation > largestTranslate.x.value
+      ) {
+        translateImage.x.value += deltaX;
+      }
+
+      if (width > imageDimensions.value.width) {
+        translateImage.x.value += deltaX / 2;
+      }
+
+      const areSignsDifferent = Math.sign(angle.value) !== Math.sign(translateImage.y.value);    
+      const hasGoneBeyondUpperBound = height >= rotatedOffset.height.value + upperBound.value;
+      const hasGoneBeyondLowerBound = height >= rotatedOffset.height.value + lowerBound.value;
+      if(
+        areSignsDifferent &&
+        (hasGoneBeyondLowerBound || hasGoneBeyondUpperBound) &&
+        inverseTranslation >= largestTranslate.x.value
+      ){
+        translateImage.y.value -= deltaY;
+      }
+
+      largestTranslate.x.value = Math.max(inverseTranslation, largestTranslate.x.value);
     })
     .onEnd(onEndHorizontalPan);
 
@@ -228,7 +205,7 @@ const Selection: React.FC<SelectionProps> = ({
   });
 
   return (
-    <GestureDetector gesture={rightPan}>
+    <GestureDetector gesture={leftPan}>
       <Animated.View style={[styles.selection, selectionStyles]}>
         <Animated.View style={[styles.selection, test]} />
       </Animated.View>
